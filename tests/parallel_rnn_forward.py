@@ -53,7 +53,7 @@ def parallel_rnn_forward():
         bidirectional_rnn=bidirectional_rnn,
         total_prob_rnn=total_prob_rnn,
         total_prob_rnn_rev=total_prob_rnn_rev,
-        parallel_factor=1,
+        parallel_factor=99,
     )
 
 
