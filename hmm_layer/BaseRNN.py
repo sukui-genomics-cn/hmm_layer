@@ -245,7 +245,7 @@ class BaseRNN(nn.Module):
         elif not self.return_sequences and self.return_state:
             return (output_sequence, (hx, cx)) if cx is not None else (output_sequence, hx)
         else:  # Both True
-            return output_sequence, ((hx, cx) if cx is not None else hx)
+            return output_sequence, hx
 
     def get_initial_state(
             self,

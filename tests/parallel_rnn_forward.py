@@ -50,7 +50,7 @@ def parallel_rnn_forward():
     total_prob_cell_rev = TotalProbabilityCell(cell=reverse_cell)
     total_prob_rnn_rev = BaseRNN(total_prob_cell_rev, batch_first=True, return_sequences=True, return_state=True, reverse=True)
 
-    _state_posterior_log_probs_impl(
+    outputs = _state_posterior_log_probs_impl(
         inputs=stacked_inputs,
         cell=cell,
         reverse_cell=reverse_cell,
@@ -59,6 +59,7 @@ def parallel_rnn_forward():
         total_prob_rnn_rev=total_prob_rnn_rev,
         parallel_factor=99,
     )
+    print(outputs)
 
 
 if __name__ == '__main__':
