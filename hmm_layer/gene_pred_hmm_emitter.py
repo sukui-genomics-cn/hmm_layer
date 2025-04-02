@@ -124,7 +124,7 @@ class SimpleGenePredHMMEmitter(nn.Module):
 
     def get_prior_log_density(self):
         # 可以在将来用于正则化。
-        return [[0.]]
+        return torch.tensor([[0.]])
 
     def get_aux_loss(self):
         return 0.
