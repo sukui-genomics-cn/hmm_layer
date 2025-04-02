@@ -15,20 +15,27 @@ def parallel_rnn_forward():
     batch_size = 3
     seq_len = 5
     # input_seq = torch.randn(num_model, batch_size, seq_len, input_size)
-    embedding_inputs = torch.randn(1, 32, 9999, 15)
+    embedding_inputs = torch.randn(1, 32, 9999, 7)
     nucleotide_inputs = torch.randn(1, 32, 9999, 5)
     stacked_inputs = torch.concat([embedding_inputs, nucleotide_inputs], dim=-1)
 
-    num_states = [15]
-    dim = 15
+    num_states = [7]
+    dim = 7
     emitter = GenePredHMMEmitter(
         start_codons=[("ATG", 1.)],
         stop_codons=[("TAG", .34), ("TAA", 0.33), ("TGA", 0.33)],
         intron_begin_pattern=[("NGT", 0.99), ("NGC", 0.005), ("NAT", 0.005)],
         intron_end_pattern=[("AGN", 0.99), ("ACN", 0.01)],
     )
-    emitter.build(embedding_inputs.shape)
     transitioner = GenePredMultiHMMTransitioner()
+    if dim == 7:
+        emitter = SimpleGenePredHMMEmitter()
+        transitioner = SimpleGenePredHMMTransitioner()
+
+        stacked_inputs = embedding_inputs
+
+    emitter.build(embedding_inputs.shape)
+
 
     cell = HmmCell(
         num_states=num_states,
@@ -58,8 +65,10 @@ def parallel_rnn_forward():
         total_prob_rnn=total_prob_rnn,
         total_prob_rnn_rev=total_prob_rnn_rev,
         parallel_factor=99,
+        training=True,
     )
-    print(outputs)
+
+    print(f"outputs shape: {outputs.shape}")
 
 
 if __name__ == '__main__':

@@ -375,7 +375,7 @@ def make_transition_matrix_from_indices(indices, kernel, num_states, approx_log_
     # 添加一个很小的数值以增加数值稳定性, 并将不存在的转换置零, 然后进行归一化
     dense_probs += 1e-16
     dense_probs = dense_probs * mask
-    dense_probs /= torch.sum(dense_probs, dim=-1, keepdim=True)
+    dense_probs /= (torch.sum(dense_probs, dim=-1, keepdim=True)+1e-16)
 
     return dense_probs
 
