@@ -206,8 +206,8 @@ class BaseRNN(nn.Module):
             hidden = self.get_initial_state(inputs, batch_size)
 
         # Unpack hidden state (works for both LSTM and GRU)
-        if isinstance(hidden, tuple):
-            hx, cx = hidden
+        if isinstance(self.cell, nn.LSTMCell):
+            hx, cx, name = hidden
         else:
             hx = hidden
             cx = None  # For GRU cells
@@ -219,8 +219,10 @@ class BaseRNN(nn.Module):
             if cx is not None:  # LSTM case
                 hx, cx = self.cell(current_input, (hx, cx))
                 output = hx
+            elif len(hx) == 2:
+                output, hx = self.cell(current_input, hx)
             else:  # GRU case
-                hx = self.cell(current_input, hx)
+                hx = self.cell(current_input, hx)  # For RNN
                 output = hx
             outputs.append(output)
 
@@ -266,8 +268,8 @@ class BaseRNN(nn.Module):
             # LSTM needs both hidden state and cell state
             h = torch.zeros(batch_size, self.cell.hidden_size, device=device)
             c = torch.zeros(batch_size, self.cell.hidden_size, device=device)
-            return (h, c)
-        elif isinstance(self.cell, HmmCell):
+            return (h, c, "lstm")
+        elif getattr(self.cell, "get_initial_state", None) is not None:
             hidden = self.cell.get_initial_state(inputs=inputs, batch_size=batch_size)
             return hidden
         else:

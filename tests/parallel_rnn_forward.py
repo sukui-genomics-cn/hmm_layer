@@ -38,17 +38,17 @@ def parallel_rnn_forward():
     )
 
     reverse_cell = cell.make_reverse_direction_offspring()
-    rnn = BaseRNN(cell, batch_first=True)
-    reverse_rnn = BaseRNN(reverse_cell, batch_first=True)
+    rnn = BaseRNN(cell, batch_first=True, return_sequences=True, return_state=True)
+    reverse_rnn = BaseRNN(reverse_cell, batch_first=True, return_sequences=True, return_state=True, reverse=True)
 
     bidirectional_rnn = Bidirectional(rnn, merge_mode='concat', backward_layer=reverse_rnn)
     bidirectional_rnn.forward_layer = rnn
     bidirectional_rnn.backward_layer = reverse_rnn
 
-    total_prob_cell = TotalProbabilityCell(cell=cell)
-    total_prob_rnn = BaseRNN(total_prob_cell, batch_first=True)
+    total_prob_cell = TotalProbabilityCell(cell=cell, )
+    total_prob_rnn = BaseRNN(total_prob_cell, batch_first=True, return_sequences=True, return_state=True)
     total_prob_cell_rev = TotalProbabilityCell(cell=reverse_cell)
-    total_prob_rnn_rev = BaseRNN(total_prob_cell_rev, batch_first=True)
+    total_prob_rnn_rev = BaseRNN(total_prob_cell_rev, batch_first=True, return_sequences=True, return_state=True, reverse=True)
 
     _state_posterior_log_probs_impl(
         inputs=stacked_inputs,
