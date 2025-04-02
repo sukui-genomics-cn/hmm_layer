@@ -1,16 +1,20 @@
+import torch
+
+from hmm_layer.MsaHmmCell import HmmCell
+from hmm_layer.gene_pred_hmm_emitter import SimpleGenePredHMMEmitter, GenePredHMMEmitter
+from hmm_layer.gene_pred_hmm_transitioner import SimpleGenePredHMMTransitioner, GenePredMultiHMMTransitioner
+from hmm_layer.BaseRNN import BaseRNN
+from hmm_layer.Bidirectional import Bidirectional
+from hmm_layer.TotalProbabilityCell import TotalProbabilityCell
+from hmm_layer.MsaHMMLayer import _state_posterior_log_probs_impl
+
 def parallel_rnn_forward():
-    from hmm_layer.MsaHmmCell import HmmCell
-    from hmm_layer.gene_pred_hmm_emitter import SimpleGenePredHMMEmitter, GenePredHMMEmitter
-    from hmm_layer.gene_pred_hmm_transitioner import SimpleGenePredHMMTransitioner, GenePredMultiHMMTransitioner
-    from hmm_layer.BaseRNN import BaseRNN
-    from hmm_layer.Bidirectional import Bidirectional
-    from hmm_layer.TotalProbabilityCell import TotalProbabilityCell
 
     num_model = 1
     input_size = 7
     batch_size = 3
     seq_len = 5
-    input_seq = torch.randn(num_model, batch_size, seq_len, input_size)
+    # input_seq = torch.randn(num_model, batch_size, seq_len, input_size)
     embedding_inputs = torch.randn(1, 32, 9999, 15)
     nucleotide_inputs = torch.randn(1, 32, 9999, 5)
     stacked_inputs = torch.concat([embedding_inputs, nucleotide_inputs], dim=-1)
