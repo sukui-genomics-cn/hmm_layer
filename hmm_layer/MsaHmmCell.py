@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import numpy as np
 
 from Emitter import ProfileHMMEmitter  # 假设这些类已转换为 PyTorch
 from Transitioner import ProfileHMMTransitioner

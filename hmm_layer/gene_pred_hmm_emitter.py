@@ -1,5 +1,3 @@
-import numpy as np
-import sys
 from MvnMixture import MvnMixture, DefaultDiagBijector
 import kmer
 import torch

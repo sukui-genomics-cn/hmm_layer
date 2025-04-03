@@ -1,12 +1,8 @@
 import torch
 import torch.nn as nn
-import numpy as np
 import Initializers as initializers
 import Priors as priors
-# from learnMSA.protein_language_models.BilinearSymmetric import make_scoring_model
-# import learnMSA.protein_language_models.Common as Common
 from enum import Enum
-import math
 
 class ProfileHMMEmitter(nn.Module):
     """
