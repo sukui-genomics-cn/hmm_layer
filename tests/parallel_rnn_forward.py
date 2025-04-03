@@ -1,5 +1,6 @@
 import torch
 
+from hmm_layer.Initializers import make_15_class_emission_kernel
 from hmm_layer.MsaHmmCell import HmmCell
 from hmm_layer.gene_pred_hmm_emitter import SimpleGenePredHMMEmitter, GenePredHMMEmitter
 from hmm_layer.gene_pred_hmm_transitioner import SimpleGenePredHMMTransitioner, GenePredMultiHMMTransitioner
@@ -21,15 +22,22 @@ def parallel_rnn_forward():
     nucleotide_inputs = torch.randn(1, 32, 9999, 5)
     stacked_inputs = torch.concat([embedding_inputs, nucleotide_inputs], dim=-1)
 
-
-
+    emitter_init = make_15_class_emission_kernel(smoothing=1e-2, num_copies=1)
     emitter = GenePredHMMEmitter(
         start_codons=[("ATG", 1.)],
         stop_codons=[("TAG", .34), ("TAA", 0.33), ("TGA", 0.33)],
         intron_begin_pattern=[("NGT", 0.99), ("NGC", 0.005), ("NAT", 0.005)],
         intron_end_pattern=[("AGN", 0.99), ("ACN", 0.01)],
+        initial_variance=0.05,
+        temperature=100.,
+        # init=emitter_init,
     )
-    transitioner = GenePredMultiHMMTransitioner()
+    transitioner = GenePredMultiHMMTransitioner(
+        initial_exon_len=200,
+        initial_intron_len=4500,
+        initial_ir_len=10000,
+        starting_distribution_init="zeros"
+    )
     if dim == 7:
         emitter = SimpleGenePredHMMEmitter()
         transitioner = SimpleGenePredHMMTransitioner()
