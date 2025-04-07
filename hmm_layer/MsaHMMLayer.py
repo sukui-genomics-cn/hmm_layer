@@ -4,6 +4,10 @@ import numpy as np
 from torch.nn.utils.rnn import pad_sequence
 from learnMSA.msa_hmm.Utility import deserialize  # Assuming this will be adapted
 
+from BaseRNN import BaseRNN
+from Bidirectional import Bidirectional
+from TotalProbabilityCell import TotalProbabilityCell
+
 
 class MsaHmmLayer(nn.Module):
     """A layer that computes the log-likelihood and posterior state probabilities for batches of observations
@@ -46,26 +50,20 @@ class MsaHmmLayer(nn.Module):
         self.total_prob_rnn = None
         self.total_prob_rnn_rev = None
 
+        self.build(input_shape=None)  # Placeholder, will be set in build()
+
     def build(self, input_shape):
         if hasattr(self, 'built') and self.built:
             return
 
-        # build the cell
-        self.cell.build((None, input_shape[-2], input_shape[-1]))
-
         # make a variant of the forward cell configured for backward
         self.reverse_cell = self.cell.make_reverse_direction_offspring()
-        self.reverse_cell.build((None, input_shape[-2], input_shape[-1]))
-
         # make forward rnn layer
-        self.rnn = nn.RNNBase(self.cell,
-                              batch_first=True,
-                              )
+        self.rnn = BaseRNN(self.cell, batch_first=True, return_sequences=True, return_state=True)
 
         # make backward rnn layer
-        self.rnn_backward = nn.RNNBase(self.reverse_cell,
-                                       batch_first=True,
-                                       )
+        self.rnn_backward = BaseRNN(self.reverse_cell, batch_first=True, return_sequences=True, return_state=True,
+                                    reverse=True)
 
         # make bidirectional rnn layer
         self.bidirectional_rnn = Bidirectional(self.rnn,
@@ -76,19 +74,13 @@ class MsaHmmLayer(nn.Module):
         self.bidirectional_rnn.forward_layer = self.rnn
         self.bidirectional_rnn.backward_layer = self.rnn_backward
 
-        # build the RNN layers with a different input shape
-        rnn_input_shape = (None, input_shape[-2], self.cell.max_num_states)
-        self.rnn.build(rnn_input_shape)
-        self.rnn_backward.build(rnn_input_shape)
-        self.bidirectional_rnn.build(rnn_input_shape)
-
         if self.parallel_factor > 1:
             self.total_prob_cell = TotalProbabilityCell(self.cell)
             self.total_prob_cell_rev = TotalProbabilityCell(self.reverse_cell, reverse=True)
-            self.total_prob_rnn = nn.RNNBase(self.total_prob_cell, batch_first=True, return_sequences=True,
-                                             return_state=True)
-            self.total_prob_rnn_rev = nn.RNNBase(self.total_prob_cell_rev, batch_first=True, return_sequences=True,
-                                                 return_state=True)
+            self.total_prob_rnn = BaseRNN(self.total_prob_cell, batch_first=True, return_sequences=True,
+                                          return_state=True)
+            self.total_prob_rnn_rev = BaseRNN(self.total_prob_cell_rev, batch_first=True, return_sequences=True,
+                                              return_state=True, reverse=True)
         else:
             self.total_prob_rnn = None
             self.total_prob_rnn_rev = None
@@ -468,8 +460,8 @@ def _state_posterior_log_probs_impl(inputs, cell, reverse_cell,
     # Run forward and backward in parallel
     if emission_probs.shape[1] > 2:
         posterior, *states = bidirectional_rnn(emission_probs[:, 1:-1],
-                                              initial_state=(*forward_step_1_state, *backward_step_1_state),
-                                              training=training)
+                                               initial_state=(*forward_step_1_state, *backward_step_1_state),
+                                               training=training)
     else:
         # Posterior as defined here is never used but required to make the code work
         posterior, states = torch.zeros(()), forward_step_1_state + backward_step_1_state

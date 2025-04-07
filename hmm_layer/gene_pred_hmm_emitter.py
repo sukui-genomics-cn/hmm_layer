@@ -24,14 +24,14 @@ class SimpleGenePredHMMEmitter(nn.Module):
                  num_models=1,
                  num_copies=1,
                  init=0., #ConstantInitializer(0.)
-                 trainable_emissions=True,
+                 trainable_emissions=False,
                  emit_embeddings=False, 
                  embedding_dim=None, 
                  full_covariance=False,
                  embedding_kernel_init="random_normal",
-                 initial_variance=1.,
-                 temperature=1.,
-                 share_intron_parameters=True,
+                 initial_variance=0.05,
+                 temperature=100.,
+                 share_intron_parameters=False,
                  **kwargs):
         super(SimpleGenePredHMMEmitter, self).__init__(**kwargs)
         self.num_models = num_models
@@ -62,7 +62,15 @@ class SimpleGenePredHMMEmitter(nn.Module):
         if self.built:
             return
         s = input_shape[-1]
-        self.emission_kernel = nn.Parameter(torch.full((self.num_models, self.num_states - 2 * self.num_copies * int(self.share_intron_parameters), s), float(self.init)), requires_grad=self.trainable_emissions)
+        # self.emission_kernel = nn.Parameter(torch.full(
+        #     (self.num_models, self.num_states - 2 * self.num_copies * int(self.share_intron_parameters), s),
+        #     float(self.init)),
+        #     requires_grad=self.trainable_emissions
+        # )
+        self.emission_kernel = nn.Parameter(
+            torch.from_numpy(self.init),
+            requires_grad=self.trainable_emissions
+        )
         if self.emit_embeddings:
             assert self.num_models == 1, "嵌入发射当前仅支持一个模型。您很可能意外地设置了 emit_embeddings=True。"
             d = self.embedding_dim
@@ -125,7 +133,7 @@ class SimpleGenePredHMMEmitter(nn.Module):
         return torch.tensor([[0.]])
 
     def get_aux_loss(self):
-        return 0.
+        return torch.tensor(0.)
 
 
     def get_config(self):

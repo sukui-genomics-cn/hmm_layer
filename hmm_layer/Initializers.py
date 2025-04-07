@@ -170,7 +170,7 @@ def make_15_class_emission_kernel(smoothing=0.1, num_copies=1, num_models=1, noi
     probs = np.repeat(probs[np.newaxis, ...], num_models, axis=0)
     # add random noise to each model
 
-    return np.log(probs)
+    return np.log(probs).astype(np.float32)
 
 background_distribution = make_15_class_emission_kernel()
 def make_default_emission_init():
