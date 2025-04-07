@@ -354,6 +354,7 @@ def make_transition_matrix_from_indices(indices, kernel, num_states, approx_log_
 
     # 将内核值限制在 approx_log_zero + 1 以上, 以避免过小的数值
     kernel_row_major = torch.maximum(kernel_row_major, torch.tensor(approx_log_zero + 1.0))
+    kernel_row_major[kernel_row_major == 0] = 1e-6
 
     # 创建稀疏张量
     sparse_kernel = torch.sparse_coo_tensor(

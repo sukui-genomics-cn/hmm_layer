@@ -1,3 +1,5 @@
+import copy
+
 import torch
 import torch.nn as nn
 
@@ -122,7 +124,7 @@ class HmmCell(nn.Module):
             indices = torch.arange(self.max_num_states).repeat(self.num_models * batch_size)
             init_dist = torch.nn.functional.one_hot(indices, num_classes=self.max_num_states).float()
             if self.reverse:
-                init_dist_chunk = init_dist.view(self.num_models * batch_size, self.max_num_states, self.max_num_states)
+                init_dist_chunk = init_dist.clone().view(self.num_models * batch_size, self.max_num_states, self.max_num_states)
                 first_emissions = inputs[:, 0, :].view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states)
                 first_emissions = torch.roll(first_emissions, shifts=-1, dims=2).view(self.num_models * batch_size, 1, self.max_num_states)
                 init_dist_chunk *= first_emissions
@@ -150,10 +152,12 @@ class HmmCell(nn.Module):
         prior = sum(em_priors) + sum(trans_priors.values())
         return prior
 
+    # @classmethod
     def make_reverse_direction_offspring(self):
         """返回一个共享此单元参数的单元, 该单元配置为计算后向递归。"""
-        reverse_cell = HmmCell(self.num_states, self.dim, self.emitter, self.transitioner)
-        reverse_cell.reverse_direction()
+        reverse_cell = copy.deepcopy(HmmCell(self.num_states, self.dim, self.emitter, self.transitioner))
+        reverse_cell.reverse = True
+        reverse_cell.transitioner.reverse = True
         reverse_cell.recurrent_init()
         return reverse_cell
 

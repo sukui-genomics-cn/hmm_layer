@@ -8,7 +8,7 @@ from MsaHmmCell import HmmCell
 from gene_pred_hmm_emitter import GenePredHMMEmitter
 from gene_pred_hmm_transitioner import GenePredMultiHMMTransitioner
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
@@ -56,9 +56,10 @@ def run_hmm_layer():
         parallel_factor=99
     )
     outputs = hmm_layer.state_posterior_log_probs(
-        inputs=stacked_inputs, training=True, no_loglik=False,return_prior=True
+        inputs=stacked_inputs, training=True, no_loglik=False, return_prior=True
     )
     logger.info(f"outputs {outputs}")
+    logger.info("end run hmm_layer")
 
 
 if __name__ == '__main__':

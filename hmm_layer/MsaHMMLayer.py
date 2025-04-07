@@ -52,7 +52,7 @@ class MsaHmmLayer(nn.Module):
 
         self.build(input_shape=None)  # Placeholder, will be set in build()
 
-    def build(self, input_shape):
+    def build(self, input_shape=None):
         if hasattr(self, 'built') and self.built:
             return
 
@@ -63,7 +63,7 @@ class MsaHmmLayer(nn.Module):
 
         # make backward rnn layer
         self.rnn_backward = BaseRNN(self.reverse_cell, batch_first=True, return_sequences=True, return_state=True,
-                                    reverse=True)
+                                    reverse=self.reverse_cell.reverse)
 
         # make bidirectional rnn layer
         self.bidirectional_rnn = Bidirectional(self.rnn,

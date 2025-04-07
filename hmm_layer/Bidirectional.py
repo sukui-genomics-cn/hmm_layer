@@ -141,14 +141,16 @@ class Bidirectional(nn.Module):
             reversed_sequences = torch.flip(sequences, [1])
         else:
             reversed_sequences = torch.flip(sequences, [0])
-        backward_output, backward_states = self.backward_layer(reversed_sequences, backward_state)
+        backward_output, backward_states = self.backward_layer(sequences, backward_state)
 
         # Reverse the backward output to align with the forward output
-        if self.backward_layer.batch_first:
-            backward_output = torch.flip(backward_output, [1])
-        else:
-            backward_output = torch.flip(backward_output, [0])
+        # if self.backward_layer.batch_first:
+        #     backward_output = torch.flip(backward_output, [1])
+        # else:
+        #     backward_output = torch.flip(backward_output, [0])
 
+        if self.return_sequences:
+            backward_output = torch.flip(backward_output, dims=[1])  # 沿第1维（序列维度）反转
         # Merge outputs
         if self.merge_mode == "concat":
             output = torch.cat([forward_output, backward_output], dim=-1)
