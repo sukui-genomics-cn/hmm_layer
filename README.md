@@ -11,6 +11,23 @@ This repository implements a Torch-based Hidden Markov Model (HMM) Layer designe
 
 The HMM Layer provides a modular framework that can be integrated into deep learning pipelines for sequence analysis tasks.
 
+## Project Structure
+
+The repository is organized as follows:
+
+- `hmm_layer/` - Core implementation of the HMM Layer.
+  - `BaseRNN.py` - Base RNN implementation.
+  - `Bidirectional.py` - Bidirectional RNN support.
+  - `Emitter.py` - Emission probability manager.
+  - `HMMCell.py` - Core HMM cell implementing the forward algorithm.
+  - `MsaHmmCell.py` - HMM cell for multiple sequence alignment.
+  - `MsaHMMLayer.py` - HMM layer for multiple sequence alignment.
+  - `TotalProbabilityCell.py` - Total probability computation cell.
+  - `Transitioner.py` - State transition probability manager.
+- `requirements.txt` - List of dependencies.
+- `README.md` - Project documentation.
+- `setup.py` - Installation script for the package.
+
 ## Core Modules
 
 ### 1. Transitioner
@@ -34,10 +51,28 @@ pip install -r requirements.txt
 ## Dependencies
 
 - Python 3.9
-- TensorFlow 2.10.0
+- torch
 - NumPy
 - SciPy
 
+
+## Usage Example
+```python
+import torch
+
+from hmm_layer import GenePredHMMLayer
+
+dim = 15
+stacked_inputs = torch.randn(size=(1,2,9999,20))
+layer = GenePredHMMLayer(
+    parallel_factor=99
+)
+outputs = layer(
+    inputs=stacked_inputs,
+    training=True,
+)
+print(f'outputs shape: {outputs.shape}')
+```
 
 ## References
 

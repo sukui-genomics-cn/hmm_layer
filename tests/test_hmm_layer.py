@@ -84,7 +84,7 @@ def test_gene_hmm_layer():
         inputs=stacked_inputs,
         training=True,
     )
-    logger.info(f"outputs {outputs}")
+    logger.info(f"outputs shape {outputs.shape}")
     logger.info("end run hmm_layer")
 
 if __name__ == '__main__':
