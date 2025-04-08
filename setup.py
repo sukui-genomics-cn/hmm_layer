@@ -11,7 +11,7 @@ setup(
     url="https://github.com/sukui-genomics-cn/hmm_layer.git",
     packages=find_packages(),
     install_requires=[
-        "torch>=1.12.0",
+        "torch",
         "numpy",
         "scipy",
     ],
