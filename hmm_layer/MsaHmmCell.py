@@ -155,6 +155,7 @@ class HmmCell(nn.Module):
     # @classmethod
     def make_reverse_direction_offspring(self):
         """返回一个共享此单元参数的单元, 该单元配置为计算后向递归。"""
+        # copy_transitioner =
         reverse_cell = copy.deepcopy(HmmCell(self.num_states, self.dim, self.emitter, self.transitioner))
         reverse_cell.reverse = True
         reverse_cell.transitioner.reverse = True

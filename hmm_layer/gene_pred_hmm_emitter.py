@@ -58,10 +58,10 @@ class SimpleGenePredHMMEmitter(nn.Module):
         self.embedding_emit = None
         self.built = False
 
-    def build(self, input_shape):
+    def build(self):
         if self.built:
             return
-        s = input_shape[-1]
+        # s = input_shape[-1]
         # self.emission_kernel = nn.Parameter(torch.full(
         #     (self.num_models, self.num_states - 2 * self.num_copies * int(self.share_intron_parameters), s),
         #     float(self.init)),
@@ -224,11 +224,11 @@ class GenePredHMMEmitter(SimpleGenePredHMMEmitter):
                                             + [self.stop_codon_probs], dim=1)
         self.codon_probs = torch.cat([self.left_codon_probs, self.right_codon_probs], dim=0)  # (2, num_states, 64)
 
-    def build(self, input_shape):
+    def build(self):
         if self.built:
             return
-        super(GenePredHMMEmitter, self).build(input_shape)
-        s = input_shape[-1]
+        super(GenePredHMMEmitter, self).build()
+        # s = input_shape[-1]
         if self.trainable_nucleotides_at_exons:
             assert self.num_models == 1, "Trainable nucleotide emissions are currently only supported for one model."
             self.nuc_emission_kernel = nn.Parameter(torch.zeros(self.num_models, 3 * self.num_copies, 4), requires_grad=self.trainable_nucleotides_at_exons)

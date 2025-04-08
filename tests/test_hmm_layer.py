@@ -42,17 +42,27 @@ def run_hmm_layer():
         starting_distribution_trainable=False,
         transitions_trainable=False,
     )
-    emitter.build(embedding_inputs.shape)
+    emitter.build()
     cell = HmmCell(
         num_states=num_states,
         dim=dim,
         emitter=emitter,
         transitioner=transitioner,
-
+        use_fake_step_counter=True,
     )
+    reverse_cell = HmmCell(
+        num_states=num_states,
+        dim=dim,
+        emitter=emitter,
+        transitioner=transitioner,
+        use_fake_step_counter=True,
+    )
+    reverse_cell.reverse = True
+    reverse_cell.transitioner.reverse = True
 
     hmm_layer = MsaHmmLayer(
         cell=cell,
+        reverse_cell=reverse_cell,
         parallel_factor=99
     )
     outputs = hmm_layer.state_posterior_log_probs(
@@ -62,5 +72,20 @@ def run_hmm_layer():
     logger.info("end run hmm_layer")
 
 
+def test_gene_hmm_layer():
+    from gene_pred_hmm import GenePredHMMLayer
+
+    hmm_inputs = np.load("hmm_inputs.npy")
+
+    # Define the forward layer
+    dim = 15
+    stacked_inputs = torch.from_numpy(hmm_inputs).float()
+    layer = GenePredHMMLayer()
+    outputs = layer(
+        inputs=stacked_inputs, training=True
+    )
+    logger.info(f"outputs {outputs}")
+    logger.info("end run hmm_layer")
+
 if __name__ == '__main__':
-    run_hmm_layer()
+    test_gene_hmm_layer()

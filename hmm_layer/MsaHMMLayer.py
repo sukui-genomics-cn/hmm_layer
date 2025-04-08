@@ -25,6 +25,7 @@ class MsaHmmLayer(nn.Module):
 
     def __init__(self,
                  cell,
+                 reverse_cell=None,
                  num_seqs=None,
                  use_prior=True,
                  sequence_weights=None,
@@ -43,21 +44,21 @@ class MsaHmmLayer(nn.Module):
             self.weight_sum = None
 
         # These will be initialized in build()
-        self.reverse_cell = None
+        self.reverse_cell = reverse_cell
         self.rnn = None
         self.rnn_backward = None
         self.bidirectional_rnn = None
         self.total_prob_rnn = None
         self.total_prob_rnn_rev = None
 
-        self.build(input_shape=None)  # Placeholder, will be set in build()
+        self.build()  # Placeholder, will be set in build()
 
-    def build(self, input_shape=None):
+    def build(self):
         if hasattr(self, 'built') and self.built:
             return
 
         # make a variant of the forward cell configured for backward
-        self.reverse_cell = self.cell.make_reverse_direction_offspring()
+        # self.reverse_cell = self.cell.make_reverse_direction_offspring()
         # make forward rnn layer
         self.rnn = BaseRNN(self.cell, batch_first=True, return_sequences=True, return_state=True)
 
@@ -538,7 +539,7 @@ def parallel_rnn_forward():
         intron_begin_pattern=[("NGT", 0.99), ("NGC", 0.005), ("NAT", 0.005)],
         intron_end_pattern=[("AGN", 0.99), ("ACN", 0.01)],
     )
-    emitter.build(embedding_inputs.shape)
+    emitter.build()
     transitioner = GenePredMultiHMMTransitioner()
 
     cell = HmmCell(

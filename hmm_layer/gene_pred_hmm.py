@@ -1,0 +1,239 @@
+import numpy as np
+import torch
+from torch import nn
+
+from Initializers import make_15_class_emission_kernel
+from MsaHMMLayer import MsaHmmLayer, _state_posterior_log_probs_impl
+from MsaHmmCell import HmmCell
+from gene_pred_hmm_emitter import GenePredHMMEmitter
+from gene_pred_hmm_transitioner import GenePredMultiHMMTransitioner
+
+
+class GenePredHMMLayer(nn.Module):
+    """A PyTorch implementation of the gene prediction HMM layer."""
+
+    def __init__(self,
+                 num_models=1,
+                 num_copies=1,
+                 start_codons=[("ATG", 1.)],
+                 stop_codons=[("TAG", .34), ("TAA", 0.33), ("TGA", 0.33)],
+                 intron_begin_pattern=[("NGT", 0.99), ("NGC", 0.005), ("NAT", 0.005)],
+                 intron_end_pattern=[("AGN", 0.99), ("ACN", 0.01)],
+                 initial_exon_len=100,
+                 initial_intron_len=10000,
+                 initial_ir_len=10000,
+                 emitter_init=make_15_class_emission_kernel(smoothing=1e-2, num_copies=1),
+                 starting_distribution_init="zeros",
+                 trainable_emissions=True,
+                 trainable_transitions=True,
+                 trainable_starting_distribution=True,
+                 trainable_nucleotides_at_exons=False,
+                 emit_embeddings=False,
+                 embedding_dim=None,
+                 full_covariance=False,
+                 embedding_kernel_init="random_normal",
+                 initial_variance=1.,
+                 temperature=100.,
+                 share_intron_parameters=False,
+                 simple=False,
+                 variance_l2_lambda=0.01,
+                 disable_metrics=True,
+                 parallel_factor=1,
+                 use_border_hints=True,
+                 **kwargs):
+        super(GenePredHMMLayer, self).__init__()
+        self.num_models = num_models
+        self.num_copies = num_copies
+        self.start_codons = start_codons
+        self.stop_codons = stop_codons
+        self.intron_begin_pattern = intron_begin_pattern
+        self.intron_end_pattern = intron_end_pattern
+        self.emitter_init = emitter_init
+        self.initial_exon_len = initial_exon_len
+        self.initial_intron_len = initial_intron_len
+        self.initial_ir_len = initial_ir_len
+        self.starting_distribution_init = starting_distribution_init
+        self.trainable_emissions = trainable_emissions
+        self.trainable_transitions = trainable_transitions
+        self.trainable_starting_distribution = trainable_starting_distribution
+        self.trainable_nucleotides_at_exons = trainable_nucleotides_at_exons
+        self.emit_embeddings = emit_embeddings
+        self.embedding_dim = embedding_dim
+        self.full_covariance = full_covariance
+        self.embedding_kernel_init = embedding_kernel_init
+        self.initial_variance = initial_variance
+        self.temperature = temperature
+        self.share_intron_parameters = share_intron_parameters
+        self.simple = simple
+        self.variance_l2_lambda = variance_l2_lambda
+        self.disable_metrics = disable_metrics
+        self.parallel_factor = parallel_factor
+        self.use_border_hints = use_border_hints
+
+        # Placeholder for cell, will be initialized in build()
+        self.dim = 15
+        self.cell, self.reverse_cell = self.create_cell()
+        self.hhm_layer = MsaHmmLayer(
+            cell=self.cell,
+            reverse_cell=self.reverse_cell,
+            parallel_factor=99)
+
+    def create_cell(self):
+        emitter = GenePredHMMEmitter(
+            start_codons=self.start_codons,
+            stop_codons=self.stop_codons,
+            intron_begin_pattern=self.intron_begin_pattern,
+            intron_end_pattern=self.intron_end_pattern,
+            l2_lambda=self.variance_l2_lambda,
+            num_models=self.num_models,
+            num_copies=self.num_copies,
+            init=self.emitter_init,
+            trainable_emissions=self.trainable_emissions,
+            emit_embeddings=self.emit_embeddings,
+            embedding_dim=self.embedding_dim,
+            full_covariance=self.full_covariance,
+            embedding_kernel_init=self.embedding_kernel_init,
+            initial_variance=self.initial_variance,
+            temperature=self.temperature,
+            share_intron_parameters=self.share_intron_parameters,
+            trainable_nucleotides_at_exons=self.trainable_nucleotides_at_exons
+        )
+
+        transitioner = GenePredMultiHMMTransitioner(
+            k=self.num_copies,
+            num_models=self.num_models,
+            initial_exon_len=self.initial_exon_len,
+            initial_intron_len=self.initial_intron_len,
+            initial_ir_len=self.initial_ir_len,
+            starting_distribution_init=self.starting_distribution_init,
+            starting_distribution_trainable=self.trainable_starting_distribution,
+            transitions_trainable=self.trainable_transitions
+        )
+
+        # Initialize the cell
+        emitter.build()
+        cell = HmmCell(
+            num_states=[emitter.num_states] * self.num_models,
+            dim=self.dim,
+            emitter=emitter,
+            transitioner=transitioner,
+            use_fake_step_counter=True,
+        )
+
+        reverse_cell = HmmCell(
+            num_states=[emitter.num_states] * self.num_models,
+            dim=self.dim,
+            emitter=emitter,
+            transitioner=transitioner,
+            use_fake_step_counter=True,
+        )
+        reverse_cell.reverse = True
+        reverse_cell.transitioner.reverse = True
+        return cell, reverse_cell
+
+    def forward(self, inputs, nucleotides=None, embeddings=None, end_hints=None, training=False, use_loglik=True):
+        """
+        Computes the state posterior log-probabilities.
+        Args:
+                inputs: Shape (batch, len, alphabet_size)
+                nucleotides: Shape (batch, len, 5) one-hot encoded nucleotides with N in the last position.
+                embeddings: Shape (batch, len, dim) embeddings of the inputs as output by a language model.
+                end_hints: A tensor of shape (batch, 2, num_states) that contains the correct state for the left and right ends of each chunk.
+        Returns:
+                State posterior log-probabilities (without loglik if use_loglik is False). The order of the states is Ir, I0, I1, I2, E0, E1, E2.
+                Shape (batch, len, number_of_states) if num_models=1 and (batch, len, num_models, number_of_states) if num_models>1.
+        """
+        if end_hints is not None:
+            end_hints = end_hints.unsqueeze(0)
+
+        if self.simple:
+            inputs_expanded = inputs.unsqueeze(0)
+            log_post, prior, _ = self.hhm_layer.state_posterior_log_probs(
+                inputs_expanded,
+                return_prior=True,
+                end_hints=end_hints,
+                training=training,
+                no_loglik=not use_loglik
+            )
+        else:
+            # stacked_inputs = self.concat_inputs(inputs, nucleotides, embeddings)
+            # TODO: Remove this hardcoded path for testing
+            stacked_inputs = np.load("hmm_inputs.npy")
+            stacked_inputs = torch.from_numpy(stacked_inputs).float()
+            log_post, prior, _ = _state_posterior_log_probs_impl(
+                stacked_inputs,
+                self.hhm_layer.cell,
+                self.hhm_layer.reverse_cell,
+                self.hhm_layer.bidirectional_rnn,
+                self.hhm_layer.total_prob_rnn,
+                self.hhm_layer.total_prob_rnn_rev,
+                end_hints=end_hints,
+                return_prior=True,
+                training=training,
+                no_loglik=False,
+                parallel_factor=99
+            )
+
+        if training:
+            prior = prior.mean()
+            self.loss = prior  # Store loss for backward pass
+            # For metrics tracking, you might want to use something like:
+            if not hasattr(self, 'metrics'):
+                self.metrics = {}
+            self.metrics['prior'] = prior.item()
+
+        if self.num_models == 1:
+            return log_post[0]
+        else:
+            return log_post.permute(1, 2, 0, 3)  # Equivalent to tf.transpose
+
+    def concat_inputs(self, inputs, nucleotides, embeddings=None):
+        assert nucleotides is not None
+        inputs = inputs.unsqueeze(0)
+        nucleotides = nucleotides.unsqueeze(0)
+        input_list = [inputs, nucleotides]
+        if self.emit_embeddings:
+            assert embeddings is not None
+            embeddings = embeddings.unsqueeze(0)
+            input_list.insert(1, embeddings)
+        stacked_inputs = torch.cat(input_list, dim=-1)
+        return stacked_inputs
+
+
+def create_hmm_layer():
+    # Define the forward layer
+    dim = 15
+    num_states = [dim]
+    # stacked_inputs = torch.concat([embedding_inputs, nucleotide_inputs], dim=-1)
+    emitter_init = make_15_class_emission_kernel(smoothing=1e-2, num_copies=1)
+    emitter = GenePredHMMEmitter(
+        start_codons=[("ATG", 1.)],
+        stop_codons=[("TAG", .34), ("TAA", 0.33), ("TGA", 0.33)],
+        intron_begin_pattern=[("NGT", 0.99), ("NGC", 0.005), ("NAT", 0.005)],
+        intron_end_pattern=[("AGN", 0.99), ("ACN", 0.01)],
+        initial_variance=0.05,
+        temperature=100.,
+        init=emitter_init,
+    )
+    transitioner = GenePredMultiHMMTransitioner(
+        initial_exon_len=200,
+        initial_intron_len=4500,
+        initial_ir_len=10000,
+        starting_distribution_init="zeros",
+        starting_distribution_trainable=False,
+        transitions_trainable=False,
+    )
+    emitter.build()
+    cell = HmmCell(
+        num_states=num_states,
+        dim=dim,
+        emitter=emitter,
+        transitioner=transitioner,
+        use_fake_step_counter=True,
+    )
+
+    hmm_layer = MsaHmmLayer(
+        cell=cell,
+        parallel_factor=99
+    )
+    return hmm_layer
