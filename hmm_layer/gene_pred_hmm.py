@@ -1,12 +1,11 @@
 import numpy as np
 import torch
-from torch import nn
 
 from BaseRNN import BaseRNN
+from MsaHmmCell import HmmCell
 from Bidirectional import Bidirectional
 from Initializers import make_15_class_emission_kernel
 from MsaHMMLayer import MsaHmmLayer, _state_posterior_log_probs_impl
-from MsaHmmCell import HmmCell
 from TotalProbabilityCell import TotalProbabilityCell
 from gene_pred_hmm_emitter import GenePredHMMEmitter
 from gene_pred_hmm_transitioner import GenePredMultiHMMTransitioner
@@ -70,12 +69,11 @@ class GenePredHMMLayer(MsaHmmLayer):
         self.simple = simple
         self.variance_l2_lambda = variance_l2_lambda
         self.disable_metrics = disable_metrics
-        self.parallel_factor = parallel_factor
         self.use_border_hints = use_border_hints
 
         # Placeholder for cell, will be initialized in build()
         self.dim = 15
-        super(GenePredHMMLayer, self).__init__()
+        super(GenePredHMMLayer, self).__init__(parallel_factor=parallel_factor)
 
     def build(self):
         if hasattr(self, 'built') and self.built:
@@ -205,7 +203,7 @@ class GenePredHMMLayer(MsaHmmLayer):
                 return_prior=True,
                 training=training,
                 no_loglik=False,
-                parallel_factor=99
+                parallel_factor=self.parallel_factor,
             )
 
         if training:

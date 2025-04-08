@@ -80,13 +80,16 @@ def test_gene_hmm_layer():
     # Define the forward layer
     dim = 15
     stacked_inputs = torch.from_numpy(hmm_inputs).float()
-    layer = GenePredHMMLayer()
+    layer = GenePredHMMLayer(
+        parallel_factor=99
+    )
     outputs = layer(
-        inputs=stacked_inputs, training=True
+        inputs=stacked_inputs,
+        training=True,
     )
     logger.info(f"outputs {outputs}")
     logger.info("end run hmm_layer")
 
 if __name__ == '__main__':
-    run_hmm_layer()
+    # run_hmm_layer()
     test_gene_hmm_layer()

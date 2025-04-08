@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import numpy as np
-from torch.nn.utils.rnn import pad_sequence
 from learnMSA.msa_hmm.Utility import deserialize  # Assuming this will be adapted
 
 from BaseRNN import BaseRNN
