@@ -24,7 +24,7 @@ class HmmCell(nn.Module):
         use_fake_step_counter: 仅用于 Tiberius 的向后兼容性, 否则永远不要将其设置为 True。
         **kwargs: 其他关键字参数。
     """
-    def __init__(self, num_states, dim, emitter, transitioner, use_step_counter=False, use_fake_step_counter=False, **kwargs):
+    def __init__(self, num_states, dim, emitter, transitioner, use_step_counter=False, use_fake_step_counter=False, device=None, **kwargs):
         super(HmmCell, self).__init__(**kwargs)
         self.num_states = num_states
         self.num_models = len(self.num_states)
@@ -36,6 +36,8 @@ class HmmCell(nn.Module):
         self.reverse = False
         self.use_step_counter = use_step_counter
         self.use_fake_step_counter = use_fake_step_counter
+
+        self.device = device
 
         # 初始化参数
         self.recurrent_init()
@@ -115,14 +117,14 @@ class HmmCell(nn.Module):
         """
         if parallel_factor == 1:
             if self.reverse:
-                init_dist = torch.ones((self.num_models * batch_size, self.max_num_states), dtype=torch.float32)
+                init_dist = torch.ones((self.num_models * batch_size, self.max_num_states), dtype=torch.float32, device=self.device)
             else:
-                init_dist = self.make_initial_distribution().repeat(batch_size, 1, 1).transpose(0, 1).reshape(-1, self.max_num_states)
-            loglik = torch.zeros((self.num_models * batch_size, 1), dtype=torch.float32)
-            return [init_dist, loglik]
+                init_dist = self.make_initial_distribution().repeat(batch_size, 1, 1).transpose(0, 1).reshape(-1, self.max_num_states).to(self.device)
+            loglik = torch.zeros((self.num_models * batch_size, 1), dtype=torch.float32, device=self.device)
+            return [init_dist.to(self.device), loglik.to(self.device)]
         else:
             indices = torch.arange(self.max_num_states).repeat(self.num_models * batch_size)
-            init_dist = torch.nn.functional.one_hot(indices, num_classes=self.max_num_states).float()
+            init_dist = torch.nn.functional.one_hot(indices, num_classes=self.max_num_states).float().to(self.device)
             if self.reverse:
                 init_dist_chunk = init_dist.clone().view(self.num_models * batch_size, self.max_num_states, self.max_num_states)
                 first_emissions = inputs[:, 0, :].view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states)
@@ -132,16 +134,16 @@ class HmmCell(nn.Module):
                 init_dist_chunk = init_dist
             init_dist_chunk = init_dist_chunk.view(self.num_models, batch_size * self.max_num_states, self.max_num_states)
             init_dist_trans = self.transitioner(init_dist_chunk).view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states * self.max_num_states)
-            is_first_chunk = torch.zeros((self.num_models, batch_size // parallel_factor, parallel_factor - 1, self.max_num_states * self.max_num_states), dtype=torch.float32)
+            is_first_chunk = torch.zeros((self.num_models, batch_size // parallel_factor, parallel_factor - 1, self.max_num_states * self.max_num_states), dtype=torch.float32, device=self.device)
             if self.reverse:
-                is_first_chunk = torch.cat([is_first_chunk, torch.ones_like(is_first_chunk[..., :1, :])], dim=2)
+                is_first_chunk = torch.cat([is_first_chunk, torch.ones_like(is_first_chunk[..., :1, :])], dim=2).to(self.device)
             else:
-                is_first_chunk = torch.cat([torch.ones_like(is_first_chunk[..., :1, :]), is_first_chunk], dim=2)
+                is_first_chunk = torch.cat([torch.ones_like(is_first_chunk[..., :1, :]), is_first_chunk], dim=2).to(self.device)
             init_dist = init_dist.view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states * self.max_num_states)
             init_dist = is_first_chunk * init_dist + (1 - is_first_chunk) * init_dist_trans
             init_dist = init_dist.view(self.num_models * batch_size, self.max_num_states * self.max_num_states)
-            loglik = torch.zeros((self.num_models * batch_size, self.max_num_states), dtype=torch.float32)
-            return [init_dist, loglik]
+            loglik = torch.zeros((self.num_models * batch_size, self.max_num_states), dtype=torch.float32, device=self.device)
+            return [init_dist.to(self.device), loglik.to(self.device)]
 
     def get_aux_loss(self):
         return sum([em.get_aux_loss() for em in self.emitter])

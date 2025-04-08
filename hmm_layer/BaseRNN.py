@@ -203,6 +203,7 @@ class BaseRNN(nn.Module):
         if hidden is None:
             hidden = self.get_initial_state(inputs, batch_size)
 
+
         # Unpack hidden state (works for both LSTM and GRU)
         if isinstance(self.cell, nn.LSTMCell):
             hx, cx, name = hidden
@@ -272,7 +273,7 @@ class BaseRNN(nn.Module):
             return hidden
         else:
             # GRU and other cells typically just need hidden state
-            return torch.zeros(batch_size, self.cell.hidden_size, device=device)
+            return torch.zeros(batch_size, self.cell.hidden_size, device=device).to(inputs.device)
 
 
 def test_base_rnn():

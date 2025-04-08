@@ -33,6 +33,7 @@ class SimpleGenePredHMMEmitter(nn.Module):
                  initial_variance=0.05,
                  temperature=100.,
                  share_intron_parameters=False,
+                 device=None,
                  **kwargs):
         super(SimpleGenePredHMMEmitter, self).__init__(**kwargs)
         self.num_models = num_models
@@ -52,6 +53,7 @@ class SimpleGenePredHMMEmitter(nn.Module):
         else:
             assert embedding_dim is None, "如果 emit_embeddings=False, 则不能给出 embedding_dim。"
 
+        self.device = device
         self.emission_kernel = None
         self.embedding_emission_kernel = None
         self.mvn_mixture = None
@@ -69,7 +71,7 @@ class SimpleGenePredHMMEmitter(nn.Module):
         #     requires_grad=self.trainable_emissions
         # )
         self.emission_kernel = nn.Parameter(
-            torch.from_numpy(self.init),
+            torch.from_numpy(self.init).to(self.device),
             requires_grad=self.trainable_emissions
         )
         if self.emit_embeddings:
@@ -223,7 +225,7 @@ class GenePredHMMEmitter(SimpleGenePredHMMEmitter):
                                             + [self.any_codon_probs]
                                             + [self.intron_end_codon_probs] * 3
                                             + [self.stop_codon_probs], dim=1)
-        self.codon_probs = torch.cat([self.left_codon_probs, self.right_codon_probs], dim=0)  # (2, num_states, 64)
+        self.codon_probs = torch.cat([self.left_codon_probs, self.right_codon_probs], dim=0).to(self.device)  # (2, num_states, 64)
 
     def build(self):
         if self.built:

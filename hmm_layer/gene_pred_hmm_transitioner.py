@@ -5,11 +5,13 @@ import numpy as np
 
 from .Transitioner import make_transition_matrix_from_indices
 
+
 class SimpleGenePredHMMTransitioner(nn.Module):
     """
     定义 HMM 状态之间允许的转换以及如何初始化它们。
     假设状态顺序 : Ir, I0, I1, I2, E0, E1, E2
     """
+
     def __init__(self,
                  num_models=1,
                  initial_exon_len=100,
@@ -19,7 +21,8 @@ class SimpleGenePredHMMTransitioner(nn.Module):
                  starting_distribution_init="zeros",
                  starting_distribution_trainable=True,
                  transitions_trainable=True,
-                 init_component_sd=0, # 0.2
+                 init_component_sd=0,  # 0.2
+                 device=None,
                  **kwargs):
         super(SimpleGenePredHMMTransitioner, self).__init__(**kwargs)
         self.num_models = num_models
@@ -38,10 +41,18 @@ class SimpleGenePredHMMTransitioner(nn.Module):
             self.init = self.make_transition_init(1, init_component_sd)
         else:
             self.init = init
-        self.transition_kernel = nn.Parameter(torch.tensor(self.init).to(torch.float32).unsqueeze(0), requires_grad=self.transitions_trainable)
-        self.starting_distribution_kernel = nn.Parameter(torch.zeros(1, 1, self.num_states).to(torch.float32), requires_grad=self.starting_distribution_trainable) if starting_distribution_init == "zeros" else nn.Parameter(torch.ones(1, 1, self.num_states).float(), requires_grad=self.starting_distribution_trainable)
+        self.transition_kernel = nn.Parameter(
+            torch.tensor(self.init).to(torch.float32).unsqueeze(0),
+            requires_grad=self.transitions_trainable,
+        ).to(device=device)
+        self.starting_distribution_kernel = nn.Parameter(
+            torch.zeros(1, 1, self.num_states).to(torch.float32),
+            requires_grad=self.starting_distribution_trainable) if starting_distribution_init == "zeros" else nn.Parameter(
+            torch.ones(1, 1, self.num_states).float(), requires_grad=self.starting_distribution_trainable)
+        self.starting_distribution_kernel.to(device=device)
         self.A = None
         self.A_transposed = None
+        self.device = device
 
     def is_intergenic_loop(self, edge):
         return edge[1] == edge[2] and edge[1] == 0
@@ -53,7 +64,8 @@ class SimpleGenePredHMMTransitioner(nn.Module):
         found_any = False
         exon_offset = 1 + 3 * k
         for i in range(k):
-            found = edge[2] - exon_offset == (edge[1] - exon_offset + k) % (3 * k) and edge[1] >= exon_offset and edge[1] < exon_offset + 3 * k
+            found = edge[2] - exon_offset == (edge[1] - exon_offset + k) % (3 * k) and edge[1] >= exon_offset and edge[
+                1] < exon_offset + 3 * k
             found_any = found_any or found
         return found_any
 
@@ -68,8 +80,7 @@ class SimpleGenePredHMMTransitioner(nn.Module):
         在每次递归运行之前自动调用。应将其用于每个递归层应用仅需要一次的设置。
         """
         self.A = self.make_A()
-        self.A_transposed = torch.transpose(self.A, 1, 2)
-
+        self.A_transposed = torch.transpose(self.A, 1, 2).to(self.device)
 
     def make_A_sparse(self, values=None):
         """
@@ -93,9 +104,11 @@ class SimpleGenePredHMMTransitioner(nn.Module):
         A_sparse = torch.sparse_coo_tensor(
             indices=ordered_indices.T,  # PyTorch 稀疏张量需要转置索引
             values=probs_vec,
-            size=(1, self.num_states, self.num_states)
+            size=(1, self.num_states, self.num_states),
+            device=self.device
         )
         return A_sparse
+
     def make_A(self):
         A = self.make_A_sparse().to_dense()
         A = A.repeat(self.num_models, 1, 1)
@@ -128,43 +141,42 @@ class SimpleGenePredHMMTransitioner(nn.Module):
         # 可以在将来用于正则化。
         return {"none": 0.}
 
-
     def make_transition_indices(self, model_index=0):
         """
         返回稀疏转换矩阵内核的 3D 索引 (model_index, from_state, to_state)。
         假设状态顺序 : Ir, I0, I1, I2, E0, E1, E2
         """
         Ir = 0
-        I = list(range(1,4))
-        E = list(range(4,7))
+        I = list(range(1, 4))
+        E = list(range(4, 7))
         indices = [(Ir, Ir), (Ir, E[0]), (E[2], Ir)]
         for cds in range(3):
-            indices.append((E[cds], E[(cds+1)%3]))
+            indices.append((E[cds], E[(cds + 1) % 3]))
             indices.append((E[cds], I[cds]))
             indices.append((I[cds], I[cds]))
-            indices.append((I[cds], E[(cds+1)%3]))
+            indices.append((I[cds], E[(cds + 1) % 3]))
         indices = np.concatenate([np.full((len(indices), 1), model_index, dtype=np.int64), indices], axis=1)
-        assert len(indices)==15
+        assert len(indices) == 15
         return indices
 
     def make_transition_init(self, k=1, sd=0.05):
         # 使用大致真实的初始长度分布
         init = []
         for edge in self.indices:
-            #edge = (model, from, to), ingore model for now
-            if self.is_intergenic_loop(edge):  
+            # edge = (model, from, to), ingore model for now
+            if self.is_intergenic_loop(edge):
                 p_loop = 1 - 1. / self.initial_ir_len
-                init.append(-np.log(1/p_loop-1))
-            elif self.is_intron_loop(edge, k):   
+                init.append(-np.log(1 / p_loop - 1))
+            elif self.is_intron_loop(edge, k):
                 p_loop = 1 - 1. / self.initial_intron_len
-                init.append(-np.log(1/p_loop-1))
-            elif self.is_exon_transition(edge, k): 
+                init.append(-np.log(1 / p_loop - 1))
+            elif self.is_exon_transition(edge, k):
                 p_next_exon = 1 - 1. / self.initial_exon_len
-                init.append(-np.log(1/p_next_exon-1))
+                init.append(-np.log(1 / p_next_exon - 1))
             elif self.is_exon_1_out_transition(edge, k):
-                init.append(np.log(1./(2)))
+                init.append(np.log(1. / (2)))
             elif self.is_intergenic_out_transition(edge, k):
-                init.append(np.log(1./k) + np.random.normal(0., sd))
+                init.append(np.log(1. / k) + np.random.normal(0., sd))
             else:
                 init.append(0)
         return np.array(init)
@@ -181,12 +193,14 @@ class SimpleGenePredHMMTransitioner(nn.Module):
     def from_config(cls, config):
         return cls(**config)
 
+
 class GenePredHMMTransitioner(SimpleGenePredHMMTransitioner):
     """
     使用强制生物学结构的起始和终止状态扩展简单 HMM。
     假设状态顺序 : Ir, I0, I1, I2, E0, E1, E2,
                      START, EI0, EI1, EI2, IE0, IE1, IE2, STOP
     """
+
     def __init__(self, use_experimental_prior=False, **kwargs):
         if not hasattr(self, "num_states"):
             self.num_states = 15
@@ -202,22 +216,22 @@ class GenePredHMMTransitioner(SimpleGenePredHMMTransitioner):
         返回稀疏转换矩阵内核的 3D 索引 (model_index, from_state, to_state)。
         """
         Ir = 0
-        I = list(range(1,4))
-        E = list(range(4,7))
+        I = list(range(1, 4))
+        E = list(range(4, 7))
         START = 7
-        EI = list(range(8,11))
-        IE = list(range(11,14))
+        EI = list(range(8, 11))
+        IE = list(range(11, 14))
         STOP = 14
         indices = [(Ir, Ir), (Ir, START), (STOP, Ir), (START, E[1]), (E[1], STOP)]
         for cds in range(3):
-            indices.append((E[cds], E[(cds+1)%3]))
+            indices.append((E[cds], E[(cds + 1) % 3]))
             indices.append((E[cds], EI[cds]))
             indices.append((EI[cds], I[cds]))
             indices.append((I[cds], I[cds]))
             indices.append((I[cds], IE[cds]))
             indices.append((IE[cds], E[cds]))
         indices = np.concatenate([np.full((len(indices), 1), model_index, dtype=np.int64), indices], axis=1)
-        assert len(indices)==23
+        assert len(indices) == 23
         return indices
 
     def gather_binary_probs_for_prior(self, A):
@@ -244,7 +258,7 @@ class GenePredHMMTransitioner(SimpleGenePredHMMTransitioner):
         # 假设先验绘制次数
         # 我们根据我们看到每个转换的预期次数选择 alpha
         # 较高的值使先验更严格
-        p0 = torch.tensor(self.make_transition_init(self.k,self.init_component_sd)).float().unsqueeze(0)
+        p0 = torch.tensor(self.make_transition_init(self.k, self.init_component_sd)).float().unsqueeze(0)
         A0_sparse = self.make_A_sparse(values=p0.reshape(-1))
         A0 = A0_sparse.to_dense()[0]
         return self.gather_binary_probs_for_prior(A0) * n
@@ -260,6 +274,7 @@ class GenePredHMMTransitioner(SimpleGenePredHMMTransitioner):
         else:
             return {"none": 0.}
 
+
 class GenePredMultiHMMTransitioner(GenePredHMMTransitioner):
     """
     与 GenePredHMMTransitioner 相同, 但具有共享相同架构但参数不同的多个 (子) HMM。
@@ -269,6 +284,7 @@ class GenePredMultiHMMTransitioner(GenePredHMMTransitioner):
         k: 共享 IR 状态的基因模型副本数。
         init_component_sd: 用于初始化转换 IR -> 组件的噪声的标准差。
     """
+
     def __init__(self, k=1, init_component_sd=0.2, **kwargs):
         self.k = k
         self.num_states = 1 + 14 * k
@@ -281,32 +297,33 @@ class GenePredMultiHMMTransitioner(GenePredHMMTransitioner):
         返回稀疏转换矩阵内核的 3D 索引 (model_index, from_state, to_state)。
         """
         Ir = 0
-        I = list(range(1,1+3*self.k))
-        E = list(range(1+3*self.k,1+6*self.k))
-        START = list(range(1+6*self.k, 1+7*self.k))
-        EI = list(range(1+7*self.k, 1+10*self.k))
-        IE = list(range(1+10*self.k, 1+13*self.k))
-        STOP = list(range(1+13*self.k, 1+14*self.k))
+        I = list(range(1, 1 + 3 * self.k))
+        E = list(range(1 + 3 * self.k, 1 + 6 * self.k))
+        START = list(range(1 + 6 * self.k, 1 + 7 * self.k))
+        EI = list(range(1 + 7 * self.k, 1 + 10 * self.k))
+        IE = list(range(1 + 10 * self.k, 1 + 13 * self.k))
+        STOP = list(range(1 + 13 * self.k, 1 + 14 * self.k))
         indices = [(Ir, Ir)]
-        for hmm in range(self.k): 
-            indices.extend([(Ir, START[hmm]), (STOP[hmm], Ir), 
-                            (START[hmm], E[self.k+hmm]), (E[self.k+hmm], STOP[hmm])])
+        for hmm in range(self.k):
+            indices.extend([(Ir, START[hmm]), (STOP[hmm], Ir),
+                            (START[hmm], E[self.k + hmm]), (E[self.k + hmm], STOP[hmm])])
             for cds in range(3):
-                indices.extend([(E[self.k*cds+hmm], E[self.k*((cds+1)%3)+hmm]), 
-                                (E[self.k*cds+hmm], EI[self.k*cds+hmm]), 
-                                (EI[self.k*cds+hmm], I[self.k*cds+hmm]), 
-                                (I[self.k*cds+hmm], I[self.k*cds+hmm]), 
-                                (I[self.k*cds+hmm], IE[self.k*cds+hmm]), 
-                                (IE[self.k*cds+hmm], E[self.k*cds+hmm])])
+                indices.extend([(E[self.k * cds + hmm], E[self.k * ((cds + 1) % 3) + hmm]),
+                                (E[self.k * cds + hmm], EI[self.k * cds + hmm]),
+                                (EI[self.k * cds + hmm], I[self.k * cds + hmm]),
+                                (I[self.k * cds + hmm], I[self.k * cds + hmm]),
+                                (I[self.k * cds + hmm], IE[self.k * cds + hmm]),
+                                (IE[self.k * cds + hmm], E[self.k * cds + hmm])])
         indices = np.concatenate([np.full((len(indices), 1), model_index, dtype=np.int64), indices], axis=1)
-        assert len(indices)==1+22*self.k
+        assert len(indices) == 1 + 22 * self.k
         return indices
-    
+
     def get_config(self):
         config = super(GenePredMultiHMMTransitioner, self).get_config()
         config.update({"k": self.k})
         return config
-    
+
+
 if __name__ == '__main__':
     torch.manual_seed(42)  # 使用与 TensorFlow 相同的种子值
 
@@ -314,8 +331,8 @@ if __name__ == '__main__':
     # model.build(input_shape=(1, 2, 7))
     model.recurrent_init()
     # input_shape = (1, 2, 15)
-    inputs = torch.tensor([[[0.6645621,  0.44100678, 0.3528825,  0.46448255, 0.03366041, 0.68467236, 0.74011743],
-         [0.8724445,  0.22632635, 0.22319686, 0.3103881,  0.7223358,  0.13318717, 0.5480639]]])
+    inputs = torch.tensor([[[0.6645621, 0.44100678, 0.3528825, 0.46448255, 0.03366041, 0.68467236, 0.74011743],
+                            [0.8724445, 0.22632635, 0.22319686, 0.3103881, 0.7223358, 0.13318717, 0.5480639]]])
     print(inputs)
     outputs = model(inputs)
     print(outputs, outputs.shape)

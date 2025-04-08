@@ -17,6 +17,7 @@ class ProfileHMMEmitter(nn.Module):
                  insertion_init=initializers.make_default_insertion_init(),
                  prior=None,
                  frozen_insertions=True,
+                 device=None,
                  **kwargs):
         """
         初始化 ProfileHMMEmitter。
@@ -33,6 +34,7 @@ class ProfileHMMEmitter(nn.Module):
         self.insertion_init = [insertion_init] if not hasattr(insertion_init, '__iter__') else insertion_init
         self.prior = priors.AminoAcidPrior() if prior is None else prior
         self.frozen_insertions = frozen_insertions
+        self.device = device
 
     def set_lengths(self, lengths):
         """
@@ -63,11 +65,11 @@ class ProfileHMMEmitter(nn.Module):
         self.emission_kernel = nn.ParameterList([
             nn.Parameter(init(torch.Size([length, s])))
             for length, init in zip(self.lengths, self.emission_init)
-        ])
+        ]).to(self.device)
         self.insertion_kernel = nn.ParameterList([
             nn.Parameter(init(torch.Size([s])))
             for init in self.insertion_init
-        ])
+        ]).to(self.device)
         if self.frozen_insertions:
             for param in self.insertion_kernel:
                 param.requires_grad = False
@@ -128,7 +130,7 @@ class ProfileHMMEmitter(nn.Module):
             padding = max_num_states - em_mat.shape[0]
             em_mat_pad = torch.nn.functional.pad(em_mat, (0, 0, 0, padding))
             emission_matrices.append(em_mat_pad)
-        B = torch.stack(emission_matrices, dim=0)
+        B = torch.stack(emission_matrices, dim=0).to(self.device)
         return B
 
     def make_B_amino(self):

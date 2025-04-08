@@ -74,10 +74,12 @@ def test_gene_hmm_layer():
 
     hmm_inputs = np.load("hmm_inputs.npy")
 
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # Define the forward layer
-    stacked_inputs = torch.from_numpy(hmm_inputs[0]).float()
+    stacked_inputs = torch.from_numpy(hmm_inputs[0]).float().to(device)
     layer = GenePredHMMLayer(
-        parallel_factor=99
+        parallel_factor=99,
+        device=device,
     )
     outputs = layer(
         inputs=stacked_inputs[..., :15],

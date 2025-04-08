@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 
 from .BaseRNN import BaseRNN
@@ -42,6 +41,7 @@ class GenePredHMMLayer(MsaHmmLayer):
                  disable_metrics=True,
                  parallel_factor=1,
                  use_border_hints=True,
+                 device=None,
                  **kwargs):
 
         self.num_models = num_models
@@ -72,6 +72,7 @@ class GenePredHMMLayer(MsaHmmLayer):
         self.use_border_hints = use_border_hints
 
         # Placeholder for cell, will be initialized in build()
+        self.device = device
         self.dim = 15
         super(GenePredHMMLayer, self).__init__(parallel_factor=parallel_factor)
 
@@ -128,7 +129,8 @@ class GenePredHMMLayer(MsaHmmLayer):
             initial_variance=self.initial_variance,
             temperature=self.temperature,
             share_intron_parameters=self.share_intron_parameters,
-            trainable_nucleotides_at_exons=self.trainable_nucleotides_at_exons
+            trainable_nucleotides_at_exons=self.trainable_nucleotides_at_exons,
+            device=self.device
         )
 
         transitioner = GenePredMultiHMMTransitioner(
@@ -139,7 +141,8 @@ class GenePredHMMLayer(MsaHmmLayer):
             initial_ir_len=self.initial_ir_len,
             starting_distribution_init=self.starting_distribution_init,
             starting_distribution_trainable=self.trainable_starting_distribution,
-            transitions_trainable=self.trainable_transitions
+            transitions_trainable=self.trainable_transitions,
+            device=self.device,
         )
 
         # Initialize the cell
@@ -150,6 +153,7 @@ class GenePredHMMLayer(MsaHmmLayer):
             emitter=emitter,
             transitioner=transitioner,
             use_fake_step_counter=True,
+            device=self.device
         )
 
         reverse_cell = HmmCell(
@@ -158,6 +162,7 @@ class GenePredHMMLayer(MsaHmmLayer):
             emitter=emitter,
             transitioner=transitioner,
             use_fake_step_counter=True,
+            device=self.device
         )
         reverse_cell.reverse = True
         reverse_cell.transitioner.reverse = True

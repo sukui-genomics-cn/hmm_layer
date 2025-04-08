@@ -136,11 +136,11 @@ class Bidirectional(nn.Module):
 
         # Forward pass
         forward_output, forward_states = self.forward_layer(sequences, forward_state)
-        # Backward pass (reverse the sequence for the backward layer)
-        if self.backward_layer.batch_first:
-            reversed_sequences = torch.flip(sequences, [1])
-        else:
-            reversed_sequences = torch.flip(sequences, [0])
+        # # Backward pass (reverse the sequence for the backward layer)
+        # if self.backward_layer.batch_first:
+        #     reversed_sequences = torch.flip(sequences, [1])
+        # else:
+        #     reversed_sequences = torch.flip(sequences, [0])
         backward_output, backward_states = self.backward_layer(sequences, backward_state)
 
         # Reverse the backward output to align with the forward output

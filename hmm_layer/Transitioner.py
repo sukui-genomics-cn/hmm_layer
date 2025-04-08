@@ -359,13 +359,12 @@ def make_transition_matrix_from_indices(indices, kernel, num_states, approx_log_
 
     # 创建稀疏张量
     sparse_kernel = torch.sparse_coo_tensor(
-        torch.tensor(indices_row_major).t(),
+        torch.tensor(indices_row_major).t().to(kernel_row_major.device),
         kernel_row_major,
         (num_states, num_states)
     )
 
     # 将稀疏张量转换为稠密张量, 默认值为 approx_log_zero
-    dense_kernel = sparse_kernel.to_dense()
     dense_kernel = torch.where(sparse_kernel.to_dense() == 0, torch.full_like(sparse_kernel.to_dense(), approx_log_zero), sparse_kernel.to_dense())
 
     # 对稠密内核应用 softmax, 忽略不存在的转换
