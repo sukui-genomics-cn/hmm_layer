@@ -34,12 +34,13 @@ class TestRNN(unittest.TestCase):
 
         from hmm_layer import GenePredHMMLayer
 
-        stacked_inputs = torch.randn(size=(1, 2, 9999, 20))
+        stacked_inputs = torch.randn(size=(2, 9999, 20))
         layer = GenePredHMMLayer(
             parallel_factor=99
         )
         outputs = layer(
-            inputs=stacked_inputs,
+            inputs=stacked_inputs[..., :15],
+            nucleotides=stacked_inputs[..., -5:],
             training=True,
         )
         print(f'outputs shape: {outputs.shape}')

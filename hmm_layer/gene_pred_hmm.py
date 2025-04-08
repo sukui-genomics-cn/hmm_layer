@@ -177,6 +177,8 @@ class GenePredHMMLayer(MsaHmmLayer):
         """
         if end_hints is not None:
             end_hints = end_hints.unsqueeze(0)
+        assert inputs.shape[-1] == 15, "inputs should be of shape (batch, len, 15) with 15 being the number of nucleotides"
+        assert nucleotides.shape[-1] == 5, "nucleotides should be of shape (batch, len, 5) with 5 being the number of nucleotides"
 
         if self.simple:
             inputs_expanded = inputs.unsqueeze(0)
@@ -188,10 +190,8 @@ class GenePredHMMLayer(MsaHmmLayer):
                 no_loglik=not use_loglik
             )
         else:
-            # stacked_inputs = self.concat_inputs(inputs, nucleotides, embeddings)
+            stacked_inputs = self.concat_inputs(inputs, nucleotides, embeddings)
             # TODO: Remove this hardcoded path for testing
-            stacked_inputs = np.load("hmm_inputs.npy")
-            stacked_inputs = torch.from_numpy(stacked_inputs).float()
             log_post, prior, _ = _state_posterior_log_probs_impl(
                 stacked_inputs,
                 self.cell,

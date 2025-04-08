@@ -75,17 +75,18 @@ def test_gene_hmm_layer():
     hmm_inputs = np.load("hmm_inputs.npy")
 
     # Define the forward layer
-    dim = 15
-    stacked_inputs = torch.from_numpy(hmm_inputs).float()
+    stacked_inputs = torch.from_numpy(hmm_inputs[0]).float()
     layer = GenePredHMMLayer(
         parallel_factor=99
     )
     outputs = layer(
-        inputs=stacked_inputs,
+        inputs=stacked_inputs[..., :15],
+        nucleotides=stacked_inputs[..., -5:],
         training=True,
     )
     logger.info(f"outputs shape {outputs.shape}")
     logger.info("end run hmm_layer")
+
 
 if __name__ == '__main__':
     # run_hmm_layer()
