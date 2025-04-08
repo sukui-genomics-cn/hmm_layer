@@ -1,7 +1,6 @@
 # Hidden Markov Model (HMM) Layer for Genomic Structure Prediction
 
 ![Python Version](https://img.shields.io/badge/python-3.9-blue.svg)
-![TensorFlow Version](https://img.shields.io/badge/tensorflow-2.10.0-orange.svg)
 
 ## Overview
 
