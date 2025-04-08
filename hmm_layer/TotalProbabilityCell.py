@@ -15,7 +15,6 @@ class TotalProbabilityCell(nn.Module):
         super(TotalProbabilityCell, self).__init__()
         self.cell = cell
         self.reverse = reverse
-        self.device = cell.device
 
     @property
     def sate_size(self):
@@ -49,17 +48,17 @@ class TotalProbabilityCell(nn.Module):
         output = forward
         return output, new_state
 
-    def get_initial_state(self, batch_size=None, inputs=None, dtype=None):
+    def get_initial_state(self, batch_size=None, inputs=None, dtype=None, device=None):
         if self.reverse:
-            init_dist = torch.zeros(batch_size, self.cell.max_num_states, dtype=dtype, device=self.device)
-            loglik = torch.zeros(batch_size, dtype=dtype, device=self.device)
+            init_dist = torch.zeros(batch_size, self.cell.max_num_states, dtype=dtype, device=device)
+            loglik = torch.zeros(batch_size, dtype=dtype, device=device)
             state = (init_dist, loglik)
         else:
             init_dist = self.make_initial_distribution()
             init_dist = init_dist.repeat(batch_size // self.cell.num_models, 1, 1)
             init_dist = init_dist.transpose(0, 1)
-            init_dist = init_dist.reshape(-1, self.cell.max_num_states).to(self.device)
-            loglike = torch.zeros((batch_size), dtype=dtype, device=self.device)
+            init_dist = init_dist.reshape(-1, self.cell.max_num_states).to(device)
+            loglike = torch.zeros((batch_size), dtype=dtype, device=device)
             state = (torch.log(init_dist), loglike)
         return state
 

@@ -30,14 +30,13 @@ class HmmCell(nn.Module):
         self.num_models = len(self.num_states)
         self.max_num_states = max(self.num_states)
         self.dim = dim
-        self.emitter = [emitter] if not isinstance(emitter, list) else emitter
+        emitter = [emitter] if not isinstance(emitter, list) else emitter
+        self.emitter = nn.ModuleList(emitter)
         self.transitioner = transitioner
         self.epsilon = 1e-16
         self.reverse = False
         self.use_step_counter = use_step_counter
         self.use_fake_step_counter = use_fake_step_counter
-
-        self.device = device
 
         # 初始化参数
         self.recurrent_init()
@@ -109,7 +108,7 @@ class HmmCell(nn.Module):
             self.step_counter += 1
         return output, new_state
 
-    def get_initial_state(self, inputs=None, batch_size=None, parallel_factor=1):
+    def get_initial_state(self, inputs=None, batch_size=None, parallel_factor=1, device=None):
         """返回初始递归状态, 该状态是一对张量 : 缩放的前向概率 (形状为 (num_models*batch, num_states)) 
         和对数似然 (形状为 (num_models*batch, 1)) 。
         返回值可以安全地重塑为 (num_models, batch, ...)。
@@ -117,14 +116,14 @@ class HmmCell(nn.Module):
         """
         if parallel_factor == 1:
             if self.reverse:
-                init_dist = torch.ones((self.num_models * batch_size, self.max_num_states), dtype=torch.float32, device=self.device)
+                init_dist = torch.ones((self.num_models * batch_size, self.max_num_states), dtype=torch.float32, device=device)
             else:
-                init_dist = self.make_initial_distribution().repeat(batch_size, 1, 1).transpose(0, 1).reshape(-1, self.max_num_states).to(self.device)
-            loglik = torch.zeros((self.num_models * batch_size, 1), dtype=torch.float32, device=self.device)
-            return [init_dist.to(self.device), loglik.to(self.device)]
+                init_dist = self.make_initial_distribution().repeat(batch_size, 1, 1).transpose(0, 1).reshape(-1, self.max_num_states).to(device)
+            loglik = torch.zeros((self.num_models * batch_size, 1), dtype=torch.float32, device=device)
+            return [init_dist.to(device), loglik.to(device)]
         else:
             indices = torch.arange(self.max_num_states).repeat(self.num_models * batch_size)
-            init_dist = torch.nn.functional.one_hot(indices, num_classes=self.max_num_states).float().to(self.device)
+            init_dist = torch.nn.functional.one_hot(indices, num_classes=self.max_num_states).float().to(device)
             if self.reverse:
                 init_dist_chunk = init_dist.clone().view(self.num_models * batch_size, self.max_num_states, self.max_num_states)
                 first_emissions = inputs[:, 0, :].view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states)
@@ -132,18 +131,18 @@ class HmmCell(nn.Module):
                 init_dist_chunk *= first_emissions
             else:
                 init_dist_chunk = init_dist
-            init_dist_chunk = init_dist_chunk.view(self.num_models, batch_size * self.max_num_states, self.max_num_states)
+            init_dist_chunk = init_dist_chunk.view(self.num_models, batch_size * self.max_num_states, self.max_num_states).to(device)
             init_dist_trans = self.transitioner(init_dist_chunk).view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states * self.max_num_states)
-            is_first_chunk = torch.zeros((self.num_models, batch_size // parallel_factor, parallel_factor - 1, self.max_num_states * self.max_num_states), dtype=torch.float32, device=self.device)
+            is_first_chunk = torch.zeros((self.num_models, batch_size // parallel_factor, parallel_factor - 1, self.max_num_states * self.max_num_states), dtype=torch.float32, device=device)
             if self.reverse:
-                is_first_chunk = torch.cat([is_first_chunk, torch.ones_like(is_first_chunk[..., :1, :])], dim=2).to(self.device)
+                is_first_chunk = torch.cat([is_first_chunk, torch.ones_like(is_first_chunk[..., :1, :])], dim=2).to(device)
             else:
-                is_first_chunk = torch.cat([torch.ones_like(is_first_chunk[..., :1, :]), is_first_chunk], dim=2).to(self.device)
+                is_first_chunk = torch.cat([torch.ones_like(is_first_chunk[..., :1, :]), is_first_chunk], dim=2).to(device)
             init_dist = init_dist.view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states * self.max_num_states)
             init_dist = is_first_chunk * init_dist + (1 - is_first_chunk) * init_dist_trans
             init_dist = init_dist.view(self.num_models * batch_size, self.max_num_states * self.max_num_states)
-            loglik = torch.zeros((self.num_models * batch_size, self.max_num_states), dtype=torch.float32, device=self.device)
-            return [init_dist.to(self.device), loglik.to(self.device)]
+            loglik = torch.zeros((self.num_models * batch_size, self.max_num_states), dtype=torch.float32, device=device)
+            return [init_dist.to(device), loglik.to(device)]
 
     def get_aux_loss(self):
         return sum([em.get_aux_loss() for em in self.emitter])

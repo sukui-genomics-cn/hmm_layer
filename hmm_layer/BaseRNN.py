@@ -269,7 +269,7 @@ class BaseRNN(nn.Module):
             c = torch.zeros(batch_size, self.cell.hidden_size, device=device)
             return (h, c, "lstm")
         elif getattr(self.cell, "get_initial_state", None) is not None:
-            hidden = self.cell.get_initial_state(inputs=inputs, batch_size=batch_size)
+            hidden = self.cell.get_initial_state(inputs=inputs, batch_size=batch_size, device=device)
             return hidden
         else:
             # GRU and other cells typically just need hidden state

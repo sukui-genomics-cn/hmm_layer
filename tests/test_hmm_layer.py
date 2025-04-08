@@ -79,8 +79,7 @@ def test_gene_hmm_layer():
     stacked_inputs = torch.from_numpy(hmm_inputs[0]).float().to(device)
     layer = GenePredHMMLayer(
         parallel_factor=99,
-        device=device,
-    )
+    ).to(device)
     outputs = layer(
         inputs=stacked_inputs[..., :15],
         nucleotides=stacked_inputs[..., -5:],

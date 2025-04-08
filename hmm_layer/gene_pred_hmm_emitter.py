@@ -71,7 +71,7 @@ class SimpleGenePredHMMEmitter(nn.Module):
         #     requires_grad=self.trainable_emissions
         # )
         self.emission_kernel = nn.Parameter(
-            torch.from_numpy(self.init).to(self.device),
+            torch.from_numpy(self.init),
             requires_grad=self.trainable_emissions
         )
         if self.emit_embeddings:
@@ -225,7 +225,9 @@ class GenePredHMMEmitter(SimpleGenePredHMMEmitter):
                                             + [self.any_codon_probs]
                                             + [self.intron_end_codon_probs] * 3
                                             + [self.stop_codon_probs], dim=1)
-        self.codon_probs = torch.cat([self.left_codon_probs, self.right_codon_probs], dim=0).to(self.device)  # (2, num_states, 64)
+        codon_probs = torch.cat([self.left_codon_probs, self.right_codon_probs], dim=0) # (2, num_states, 64)
+        self.codon_probs = nn.Parameter(codon_probs, requires_grad=False)
+        self.build()
 
     def build(self):
         if self.built:
@@ -260,7 +262,7 @@ class GenePredHMMEmitter(SimpleGenePredHMMEmitter):
         right_3mers = kmer.make_k_mers(nucleotides, k=3, pivot_left=False)
         right_3mers = right_3mers.reshape(num_models, batch, length, 64)
         input_3mers = torch.stack([left_3mers, right_3mers], dim=-2)  # (num_models, batch, length, 2, 64)
-        codon_emission_probs = torch.einsum("k...rs,rqs->k...rq", input_3mers, self.codon_probs)
+        codon_emission_probs = torch.einsum("k...rs,rqs->k...rq", input_3mers, self.codon_probs.to(inputs.device))
         codon_emission_probs = codon_emission_probs.prod(dim=-2)
 
         if self.num_copies > 1:

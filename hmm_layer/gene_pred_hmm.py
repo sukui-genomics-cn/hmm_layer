@@ -25,9 +25,9 @@ class GenePredHMMLayer(MsaHmmLayer):
                  initial_ir_len=10000,
                  emitter_init=make_15_class_emission_kernel(smoothing=1e-2, num_copies=1),
                  starting_distribution_init="zeros",
-                 trainable_emissions=True,
-                 trainable_transitions=True,
-                 trainable_starting_distribution=True,
+                 trainable_emissions=False,
+                 trainable_transitions=False,
+                 trainable_starting_distribution=False,
                  trainable_nucleotides_at_exons=False,
                  emit_embeddings=False,
                  embedding_dim=None,
@@ -146,7 +146,6 @@ class GenePredHMMLayer(MsaHmmLayer):
         )
 
         # Initialize the cell
-        emitter.build()
         cell = HmmCell(
             num_states=[emitter.num_states] * self.num_models,
             dim=self.dim,

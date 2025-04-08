@@ -80,7 +80,7 @@ class SimpleGenePredHMMTransitioner(nn.Module):
         在每次递归运行之前自动调用。应将其用于每个递归层应用仅需要一次的设置。
         """
         self.A = self.make_A()
-        self.A_transposed = torch.transpose(self.A, 1, 2).to(self.device)
+        self.A_transposed = torch.transpose(self.A, 1, 2)
 
     def make_A_sparse(self, values=None):
         """
@@ -112,6 +112,7 @@ class SimpleGenePredHMMTransitioner(nn.Module):
     def make_A(self):
         A = self.make_A_sparse().to_dense()
         A = A.repeat(self.num_models, 1, 1)
+        A = nn.Parameter(A, requires_grad=self.transitions_trainable)
         return A
 
     def make_log_A(self):
@@ -119,6 +120,7 @@ class SimpleGenePredHMMTransitioner(nn.Module):
         log_A_sparse = torch.sparse.log_softmax(A_sparse, dim=-1)
         log_A = log_A_sparse.to_dense()
         log_A = log_A.repeat(self.num_models, 1, 1)
+        log_A = nn.Parameter(log_A, requires_grad=self.transitions_trainable)
         return log_A
 
     def make_initial_distribution(self):

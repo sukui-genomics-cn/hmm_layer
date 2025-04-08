@@ -395,7 +395,7 @@ def _get_total_backward_from_chunks(backward, cell, reverse_cell, total_prob_rnn
     backward_total, (_, _) = total_prob_rnn_rev(backward_chunks_last)  # (num_model*b, factor, q)
     backward_total = torch.flip(backward_total, [1])
 
-    init, _ = reverse_cell.get_initial_state(batch_size=b, parallel_factor=1)
+    init, _ = reverse_cell.get_initial_state(batch_size=b, parallel_factor=1, device=backward_total.device)
     init = torch.log(init + reverse_cell.epsilon)
 
     T = torch.cat([backward_total[:, 1:], init.unsqueeze(1)], dim=1)
@@ -445,9 +445,17 @@ def _state_posterior_log_probs_impl(inputs, cell, reverse_cell,
     emission_probs = emission_probs.reshape(num_model * b * parallel_factor, chunk_size, q)
 
     # Make the initial states for both passes
-    initial_state = cell.get_initial_state(batch_size=b * parallel_factor, parallel_factor=parallel_factor)
-    rev_initial_state = reverse_cell.get_initial_state(inputs=emission_probs, batch_size=b * parallel_factor,
-                                                       parallel_factor=parallel_factor)
+    initial_state = cell.get_initial_state(
+        batch_size=b * parallel_factor,
+        parallel_factor=parallel_factor,
+        device=inputs.device
+    )
+    rev_initial_state = reverse_cell.get_initial_state(
+        inputs=emission_probs,
+        batch_size=b * parallel_factor,
+        parallel_factor=parallel_factor,
+        device=inputs.device
+    )
 
     # Handle the first observation separately
     forward_1, forward_step_1_state = cell(emission_probs[:, 0], initial_state, training=training, init=True)
