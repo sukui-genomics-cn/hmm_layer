@@ -2,14 +2,17 @@ import numpy as np
 import torch
 from torch import nn
 
+from BaseRNN import BaseRNN
+from Bidirectional import Bidirectional
 from Initializers import make_15_class_emission_kernel
 from MsaHMMLayer import MsaHmmLayer, _state_posterior_log_probs_impl
 from MsaHmmCell import HmmCell
+from TotalProbabilityCell import TotalProbabilityCell
 from gene_pred_hmm_emitter import GenePredHMMEmitter
 from gene_pred_hmm_transitioner import GenePredMultiHMMTransitioner
 
 
-class GenePredHMMLayer(nn.Module):
+class GenePredHMMLayer(MsaHmmLayer):
     """A PyTorch implementation of the gene prediction HMM layer."""
 
     def __init__(self,
@@ -41,7 +44,7 @@ class GenePredHMMLayer(nn.Module):
                  parallel_factor=1,
                  use_border_hints=True,
                  **kwargs):
-        super(GenePredHMMLayer, self).__init__()
+
         self.num_models = num_models
         self.num_copies = num_copies
         self.start_codons = start_codons
@@ -72,11 +75,42 @@ class GenePredHMMLayer(nn.Module):
 
         # Placeholder for cell, will be initialized in build()
         self.dim = 15
+        super(GenePredHMMLayer, self).__init__()
+
+    def build(self):
+        if hasattr(self, 'built') and self.built:
+            return
         self.cell, self.reverse_cell = self.create_cell()
-        self.hhm_layer = MsaHmmLayer(
-            cell=self.cell,
-            reverse_cell=self.reverse_cell,
-            parallel_factor=99)
+        # make a variant of the forward cell configured for backward
+        # self.reverse_cell = self.cell.make_reverse_direction_offspring()
+        # make forward rnn layer
+        self.rnn = BaseRNN(self.cell, batch_first=True, return_sequences=True, return_state=True)
+
+        # make backward rnn layer
+        self.rnn_backward = BaseRNN(self.reverse_cell, batch_first=True, return_sequences=True, return_state=True,
+                                    reverse=self.reverse_cell.reverse)
+
+        # make bidirectional rnn layer
+        self.bidirectional_rnn = Bidirectional(self.rnn,
+                                               merge_mode="concat" if self.parallel_factor > 1 else "sum",
+                                               backward_layer=self.rnn_backward)
+
+        # Override the copies made by Bidirectional
+        self.bidirectional_rnn.forward_layer = self.rnn
+        self.bidirectional_rnn.backward_layer = self.rnn_backward
+
+        if self.parallel_factor > 1:
+            self.total_prob_cell = TotalProbabilityCell(self.cell)
+            self.total_prob_cell_rev = TotalProbabilityCell(self.reverse_cell, reverse=True)
+            self.total_prob_rnn = BaseRNN(self.total_prob_cell, batch_first=True, return_sequences=True,
+                                          return_state=True)
+            self.total_prob_rnn_rev = BaseRNN(self.total_prob_cell_rev, batch_first=True, return_sequences=True,
+                                              return_state=True, reverse=True)
+        else:
+            self.total_prob_rnn = None
+            self.total_prob_rnn_rev = None
+
+        self.built = True
 
     def create_cell(self):
         emitter = GenePredHMMEmitter(
@@ -148,7 +182,7 @@ class GenePredHMMLayer(nn.Module):
 
         if self.simple:
             inputs_expanded = inputs.unsqueeze(0)
-            log_post, prior, _ = self.hhm_layer.state_posterior_log_probs(
+            log_post, prior, _ = self.state_posterior_log_probs(
                 inputs_expanded,
                 return_prior=True,
                 end_hints=end_hints,
@@ -162,11 +196,11 @@ class GenePredHMMLayer(nn.Module):
             stacked_inputs = torch.from_numpy(stacked_inputs).float()
             log_post, prior, _ = _state_posterior_log_probs_impl(
                 stacked_inputs,
-                self.hhm_layer.cell,
-                self.hhm_layer.reverse_cell,
-                self.hhm_layer.bidirectional_rnn,
-                self.hhm_layer.total_prob_rnn,
-                self.hhm_layer.total_prob_rnn_rev,
+                self.cell,
+                self.reverse_cell,
+                self.bidirectional_rnn,
+                self.total_prob_rnn,
+                self.total_prob_rnn_rev,
                 end_hints=end_hints,
                 return_prior=True,
                 training=training,

@@ -88,4 +88,5 @@ def test_gene_hmm_layer():
     logger.info("end run hmm_layer")
 
 if __name__ == '__main__':
+    run_hmm_layer()
     test_gene_hmm_layer()

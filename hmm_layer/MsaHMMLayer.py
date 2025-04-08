@@ -24,7 +24,7 @@ class MsaHmmLayer(nn.Module):
     """
 
     def __init__(self,
-                 cell,
+                 cell=None,
                  reverse_cell=None,
                  num_seqs=None,
                  use_prior=True,
