@@ -35,6 +35,7 @@ class TestRNN(unittest.TestCase):
         from hmm_layer import GenePredHMMLayer
 
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # device = torch.device("cpu")
         stacked_inputs = torch.randn(size=(2, 9999, 20)).to(device)
         layer = GenePredHMMLayer(
             parallel_factor=99
@@ -48,4 +49,8 @@ class TestRNN(unittest.TestCase):
             nucleotides=stacked_inputs[..., -5:],
             training=True,
         )
+
         print(f'outputs shape: {outputs.shape}')
+        for key, value in layer.named_parameters():
+            print(key, value.shape, value.device, value.requires_grad, value.dtype)
+

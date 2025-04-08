@@ -44,12 +44,11 @@ class SimpleGenePredHMMTransitioner(nn.Module):
         self.transition_kernel = nn.Parameter(
             torch.tensor(self.init).to(torch.float32).unsqueeze(0),
             requires_grad=self.transitions_trainable,
-        ).to(device=device)
+        )
         self.starting_distribution_kernel = nn.Parameter(
             torch.zeros(1, 1, self.num_states).to(torch.float32),
             requires_grad=self.starting_distribution_trainable) if starting_distribution_init == "zeros" else nn.Parameter(
             torch.ones(1, 1, self.num_states).float(), requires_grad=self.starting_distribution_trainable)
-        self.starting_distribution_kernel.to(device=device)
         self.A = None
         self.A_transposed = None
         self.device = device
@@ -79,8 +78,10 @@ class SimpleGenePredHMMTransitioner(nn.Module):
         """
         在每次递归运行之前自动调用。应将其用于每个递归层应用仅需要一次的设置。
         """
-        self.A = self.make_A()
-        self.A_transposed = torch.transpose(self.A, 1, 2)
+        A = self.make_A()
+        self.A = nn.Parameter(A, requires_grad=self.transitions_trainable)
+        A_transposed = torch.transpose(self.A, 1, 2)
+        self.A_transposed = nn.Parameter(A_transposed, requires_grad=self.transitions_trainable)
 
     def make_A_sparse(self, values=None):
         """
@@ -105,14 +106,12 @@ class SimpleGenePredHMMTransitioner(nn.Module):
             indices=ordered_indices.T,  # PyTorch 稀疏张量需要转置索引
             values=probs_vec,
             size=(1, self.num_states, self.num_states),
-            device=self.device
         )
         return A_sparse
 
     def make_A(self):
         A = self.make_A_sparse().to_dense()
         A = A.repeat(self.num_models, 1, 1)
-        A = nn.Parameter(A, requires_grad=self.transitions_trainable)
         return A
 
     def make_log_A(self):
@@ -120,7 +119,7 @@ class SimpleGenePredHMMTransitioner(nn.Module):
         log_A_sparse = torch.sparse.log_softmax(A_sparse, dim=-1)
         log_A = log_A_sparse.to_dense()
         log_A = log_A.repeat(self.num_models, 1, 1)
-        log_A = nn.Parameter(log_A, requires_grad=self.transitions_trainable)
+        # log_A = nn.Parameter(log_A, requires_grad=self.transitions_trainable)
         return log_A
 
     def make_initial_distribution(self):
