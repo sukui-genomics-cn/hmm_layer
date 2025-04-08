@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-import torch.distributions as dist
-import numpy as np
 import math
-from Utility import DefaultDiagBijector, FillScaleTriL
+
+from .Utility import DefaultDiagBijector, FillScaleTriL
+
 
 class MvnMixture(nn.Module):
     """
@@ -97,7 +97,8 @@ class MvnMixture(nn.Module):
             if self.diag_only:
                 scale_diag = self.diag_bijector.forward(self.kernel[..., self.dim:])
                 scale_diag += 1e-8
-                scale = scale_diag if return_scale_diag else torch.eye(self.dim, device=self.kernel.device).unsqueeze(0).unsqueeze(0).unsqueeze(0) * scale_diag.unsqueeze(-1)
+                scale = scale_diag if return_scale_diag else torch.eye(self.dim, device=self.kernel.device).unsqueeze(
+                    0).unsqueeze(0).unsqueeze(0) * scale_diag.unsqueeze(-1)
                 if return_inverse:
                     pinv = 1. / scale_diag
             else:

@@ -174,11 +174,11 @@ def make_15_class_emission_kernel(smoothing=0.1, num_copies=1, num_models=1, noi
 
 background_distribution = make_15_class_emission_kernel()
 def make_default_emission_init():
-    return EmissionInitializer(np.log(background_distribution))
+    return EmissionInitializer(np.log(background_distribution + 1e-10))
 
 
 def make_default_insertion_init():
-    return ConstantInitializer(np.log(background_distribution))
+    return ConstantInitializer(np.log(background_distribution + 1e-10))
 
 
 class EntryInitializer(nn.Module):

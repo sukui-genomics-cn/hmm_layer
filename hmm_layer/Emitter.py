@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
-import Initializers as initializers
-import Priors as priors
 from enum import Enum
+
+from . import Initializers as initializers
+from . import Priors as priors
 
 class ProfileHMMEmitter(nn.Module):
     """

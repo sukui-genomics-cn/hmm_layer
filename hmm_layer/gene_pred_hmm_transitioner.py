@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from Transitioner import make_transition_matrix_from_indices
+from .Transitioner import make_transition_matrix_from_indices
 
 class SimpleGenePredHMMTransitioner(nn.Module):
     """

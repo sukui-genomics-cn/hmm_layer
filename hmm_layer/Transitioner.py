@@ -1,11 +1,12 @@
 import numpy as np
-import Initializers as initializers
-import Priors as priors
-from Utility import get_num_states, get_num_states_implicit
-
-
 import torch
 import torch.nn as nn
+
+from . import Initializers as initializers
+from . import Priors as priors
+from .Utility import get_num_states, get_num_states_implicit
+
+
 
 
 class ProfileHMMTransitioner(nn.Module):

@@ -1,14 +1,14 @@
 import numpy as np
 import torch
 
-from BaseRNN import BaseRNN
-from MsaHmmCell import HmmCell
-from Bidirectional import Bidirectional
-from Initializers import make_15_class_emission_kernel
-from MsaHMMLayer import MsaHmmLayer, _state_posterior_log_probs_impl
-from TotalProbabilityCell import TotalProbabilityCell
-from gene_pred_hmm_emitter import GenePredHMMEmitter
-from gene_pred_hmm_transitioner import GenePredMultiHMMTransitioner
+from .BaseRNN import BaseRNN
+from .MsaHmmCell import HmmCell
+from .Bidirectional import Bidirectional
+from .Initializers import make_15_class_emission_kernel
+from .MsaHMMLayer import MsaHmmLayer, _state_posterior_log_probs_impl
+from .TotalProbabilityCell import TotalProbabilityCell
+from .gene_pred_hmm_emitter import GenePredHMMEmitter
+from .gene_pred_hmm_transitioner import GenePredMultiHMMTransitioner
 
 
 class GenePredHMMLayer(MsaHmmLayer):

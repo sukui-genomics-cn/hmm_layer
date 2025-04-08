@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
 import os
-import numpy as np
 
-# 假设 dm.load_mixture_model 已转换为 PyTorch
-# 假设 dm.DirichletMixture 已转换为 PyTorch
 
 class ProfileHMMTransitionPrior(nn.Module):
     """
@@ -19,6 +16,7 @@ class ProfileHMMTransitionPrior(nn.Module):
         alpha_global: 偏向于在第一个匹配项处进入并在最后一个匹配项后退出的高概率模型。
         epsilon: 用于数值稳定性的一个小常数。
     """
+
     def __init__(self,
                  match_comp=1,
                  insert_comp=1,
@@ -85,17 +83,17 @@ class ProfileHMMTransitionPrior(nn.Module):
             log_probs = {part_name: torch.log(p) for part_name, p in probs.items()}
             # 匹配状态转换
             p_match = torch.stack([probs["match_to_match"],
-                                     probs["match_to_insert"],
-                                     probs["match_to_delete"][1:]], dim=-1) + self.epsilon
+                                   probs["match_to_insert"],
+                                   probs["match_to_delete"][1:]], dim=-1) + self.epsilon
             p_match_sum = torch.sum(p_match, dim=-1, keepdim=True)
             match_dirichlet.append(torch.sum(self.match_dirichlet.log_prob(p_match / p_match_sum)))
             # 插入状态转换
             p_insert = torch.stack([probs["insert_to_match"],
-                                      probs["insert_to_insert"]], dim=-1)
+                                    probs["insert_to_insert"]], dim=-1)
             insert_dirichlet.append(torch.sum(self.insert_dirichlet.log_prob(p_insert)))
             # 删除状态转换
             p_delete = torch.stack([probs["delete_to_match"][:-1],
-                                      probs["delete_to_delete"]], dim=-1)
+                                    probs["delete_to_delete"]], dim=-1)
             delete_dirichlet.append(torch.sum(self.delete_dirichlet.log_prob(p_delete)))
             # 其他转换
             flank = (self.alpha_flank - 1) * log_probs["unannotated_segment_loop"]  # todo: handle as extra case?
@@ -106,7 +104,8 @@ class ProfileHMMTransitionPrior(nn.Module):
             flank += (self.alpha_flank_compl - 1) * log_probs["unannotated_segment_exit"]  # todo: handle as extra case?
             flank += (self.alpha_flank_compl - 1) * log_probs["right_flank_exit"]
             flank += (self.alpha_flank_compl - 1) * log_probs["left_flank_exit"]
-            flank += (self.alpha_flank_compl - 1) * torch.log(probs["end_to_unannotated_segment"] + probs["end_to_terminal"])
+            flank += (self.alpha_flank_compl - 1) * torch.log(
+                probs["end_to_unannotated_segment"] + probs["end_to_terminal"])
             flank += (self.alpha_flank_compl - 1) * torch.log(1 - flank_init_prob[i])
             flank_prior.append(torch.squeeze(flank))
             # 单次命中

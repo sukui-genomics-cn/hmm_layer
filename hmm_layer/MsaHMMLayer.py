@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
-from learnMSA.msa_hmm.Utility import deserialize  # Assuming this will be adapted
 
-from BaseRNN import BaseRNN
-from Bidirectional import Bidirectional
-from TotalProbabilityCell import TotalProbabilityCell
+from .BaseRNN import BaseRNN
+from .Bidirectional import Bidirectional
+from .TotalProbabilityCell import TotalProbabilityCell
 
 
 class MsaHmmLayer(nn.Module):
@@ -209,7 +208,6 @@ class MsaHmmLayer(nn.Module):
 
     @classmethod
     def from_config(cls, config):
-        config["cell"] = deserialize(config["cell"])
         if config["sequence_weights"] is not None:
             config["sequence_weights"] = torch.tensor(config["sequence_weights"], dtype=torch.float32)
         return cls(**config)

@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import numpy as np
-import os
 
 def dirichlet_log_pdf(p, alpha, q):
     """

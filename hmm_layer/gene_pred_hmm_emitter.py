@@ -1,9 +1,10 @@
-from MvnMixture import MvnMixture, DefaultDiagBijector
-import kmer
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from Initializers import ConstantInitializer
+
+from . import kmer
+from .Initializers import ConstantInitializer, make_15_class_emission_kernel
+from .MvnMixture import MvnMixture, DefaultDiagBijector
 
 class SimpleGenePredHMMEmitter(nn.Module):
     """
@@ -23,7 +24,7 @@ class SimpleGenePredHMMEmitter(nn.Module):
     def __init__(self, 
                  num_models=1,
                  num_copies=1,
-                 init=0., #ConstantInitializer(0.)
+                 init=make_15_class_emission_kernel(smoothing=1e-2, num_copies=1), #ConstantInitializer(0.)
                  trainable_emissions=False,
                  emit_embeddings=False, 
                  embedding_dim=None, 

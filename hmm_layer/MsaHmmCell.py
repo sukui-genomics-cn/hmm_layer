@@ -3,9 +3,9 @@ import copy
 import torch
 import torch.nn as nn
 
-from Emitter import ProfileHMMEmitter  # 假设这些类已转换为 PyTorch
-from Transitioner import ProfileHMMTransitioner
-from Utility import get_num_states  # 假设这些函数已转换为 PyTorch
+from .Emitter import ProfileHMMEmitter  # 假设这些类已转换为 PyTorch
+from .Transitioner import ProfileHMMTransitioner
+from .Utility import get_num_states  # 假设这些函数已转换为 PyTorch
 
 class HmmCell(nn.Module):
     """

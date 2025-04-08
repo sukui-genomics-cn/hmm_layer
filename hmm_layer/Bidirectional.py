@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Optional, Tuple, Union, List
+from typing import Optional, Tuple, Union
 
 
 class Bidirectional(nn.Module):

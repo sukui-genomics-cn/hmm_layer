@@ -3,8 +3,6 @@ from typing import Optional, Union, Tuple
 import torch
 import torch.nn as nn
 
-from MsaHmmCell import HmmCell
-
 
 class BaseRNNCell(nn.Module):
     def __init__(self, input_size, hidden_size):
