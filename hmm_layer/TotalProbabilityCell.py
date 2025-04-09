@@ -38,7 +38,7 @@ class TotalProbabilityCell(nn.Module):
         """
         old_forward, _loglik = states
         batch_size = conditional_forward.size(0)
-        conditional_forward = conditional_forward.view(batch_size, self.cell.max_num_states, self.cell.max_num_states)
+        conditional_forward = conditional_forward.reshape(batch_size, self.cell.max_num_states, self.cell.max_num_states)
 
         # expand dimension for broadcasting
         forward = old_forward.unsqueeze(-1) + conditional_forward

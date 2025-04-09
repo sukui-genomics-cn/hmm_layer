@@ -76,30 +76,30 @@ class HmmCell(nn.Module):
     def forward(self, emission_probs, states, training=None, init=False):
         """计算前向 DP 的一个递归步骤。"""
         old_scaled_forward, old_loglik = states
-        old_scaled_forward = old_scaled_forward.view(self.num_models, -1, self.max_num_states)
+        old_scaled_forward = old_scaled_forward.reshape(self.num_models, -1, self.max_num_states)
         if init:
             R = old_scaled_forward
         else:
             R = self.transitioner(old_scaled_forward)
-        E = emission_probs.view(self.num_models, -1, self.max_num_states)
+        E = emission_probs.reshape(self.num_models, -1, self.max_num_states)
         # 如果并行, 允许将输入广播到前向概率
         q = R.shape[1] // E.shape[1]  # q == 1 如果不并行, 否则 q = num_states
-        R = R.view(self.num_models, -1, q, self.max_num_states)
-        E = E.view(self.num_models, -1, 1, self.max_num_states)
-        old_loglik = old_loglik.view(self.num_models, -1, q, 1)
+        R = R.reshape(self.num_models, -1, q, self.max_num_states)
+        E = E.reshape(self.num_models, -1, 1, self.max_num_states)
+        old_loglik = old_loglik.reshape(self.num_models, -1, q, 1)
         E = torch.maximum(E, torch.tensor(self.epsilon))
         R = torch.maximum(R, torch.tensor(self.epsilon))
         scaled_forward = E * R
         S = torch.sum(scaled_forward, dim=-1, keepdim=True)
         loglik = old_loglik + torch.log(S)
         scaled_forward /= S
-        scaled_forward = scaled_forward.view(-1, q * self.max_num_states)
-        loglik = loglik.view(-1, q)
+        scaled_forward = scaled_forward.reshape(-1, q * self.max_num_states)
+        loglik = loglik.reshape(-1, q)
         new_state = [scaled_forward, loglik]
         if self.reverse:
             output = torch.log(R)
-            output = output.view(-1, q * self.max_num_states)
-            old_loglik = old_loglik.view(-1, q)
+            output = output.reshape(-1, q * self.max_num_states)
+            old_loglik = old_loglik.reshape(-1, q)
             output = torch.cat([output, old_loglik], dim=-1)
         else:
             output = torch.log(scaled_forward)
@@ -125,22 +125,22 @@ class HmmCell(nn.Module):
             indices = torch.arange(self.max_num_states).repeat(self.num_models * batch_size)
             init_dist = torch.nn.functional.one_hot(indices, num_classes=self.max_num_states).float().to(device)
             if self.reverse:
-                init_dist_chunk = init_dist.clone().view(self.num_models * batch_size, self.max_num_states, self.max_num_states)
-                first_emissions = inputs[:, 0, :].view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states)
-                first_emissions = torch.roll(first_emissions, shifts=-1, dims=2).view(self.num_models * batch_size, 1, self.max_num_states)
+                init_dist_chunk = init_dist.clone().reshape(self.num_models * batch_size, self.max_num_states, self.max_num_states)
+                first_emissions = inputs[:, 0, :].reshape(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states)
+                first_emissions = torch.roll(first_emissions, shifts=-1, dims=2).reshape(self.num_models * batch_size, 1, self.max_num_states)
                 init_dist_chunk *= first_emissions
             else:
                 init_dist_chunk = init_dist
-            init_dist_chunk = init_dist_chunk.view(self.num_models, batch_size * self.max_num_states, self.max_num_states).to(device)
-            init_dist_trans = self.transitioner(init_dist_chunk).view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states * self.max_num_states)
+            init_dist_chunk = init_dist_chunk.reshape(self.num_models, batch_size * self.max_num_states, self.max_num_states).to(device)
+            init_dist_trans = self.transitioner(init_dist_chunk).reshape(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states * self.max_num_states)
             is_first_chunk = torch.zeros((self.num_models, batch_size // parallel_factor, parallel_factor - 1, self.max_num_states * self.max_num_states), dtype=torch.float32, device=device)
             if self.reverse:
                 is_first_chunk = torch.cat([is_first_chunk, torch.ones_like(is_first_chunk[..., :1, :])], dim=2).to(device)
             else:
                 is_first_chunk = torch.cat([torch.ones_like(is_first_chunk[..., :1, :]), is_first_chunk], dim=2).to(device)
-            init_dist = init_dist.view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states * self.max_num_states)
+            init_dist = init_dist.reshape(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states * self.max_num_states)
             init_dist = is_first_chunk * init_dist + (1 - is_first_chunk) * init_dist_trans
-            init_dist = init_dist.view(self.num_models * batch_size, self.max_num_states * self.max_num_states)
+            init_dist = init_dist.reshape(self.num_models * batch_size, self.max_num_states * self.max_num_states)
             loglik = torch.zeros((self.num_models * batch_size, self.max_num_states), dtype=torch.float32, device=device)
             return [init_dist.to(device), loglik.to(device)]
 

@@ -206,7 +206,7 @@ def viterbi_chunk_dyn_prog(emission_probs, init, transition_matrix, local_gamma,
         gamma_list.append(gamma_val)  # Shape: (num_models, b, 1, q)
 
     gamma = torch.stack(gamma_list, dim=2)  # Shape: (num_models, b, num_chunks + 1, q)
-    gamma = gamma.view(gamma.size(0), gamma.size(1), num_chunks, 2,
+    gamma = gamma.reshape(gamma.size(0), gamma.size(1), num_chunks, 2,
                        gamma.size(-1))  # Shape: (num_models, b, num_chunks, 2, q)
 
     return gamma
@@ -316,7 +316,7 @@ def viterbi_chunk_backtracking(gamma, local_gamma_end_transposed, transition_mat
 
     # Stack and reshape the results
     state_seqs_max_lik = torch.cat(state_seqs_max_lik[::-1], dim=-1)  # Shape: (num_model, b, 2 * num_chunks)
-    state_seqs_max_lik = state_seqs_max_lik.view(state_seqs_max_lik.size(0), state_seqs_max_lik.size(1), num_chunks, 2)
+    state_seqs_max_lik = state_seqs_max_lik.reshape(state_seqs_max_lik.size(0), state_seqs_max_lik.size(1), num_chunks, 2)
 
     return state_seqs_max_lik
 
@@ -335,9 +335,9 @@ def viterbi_full_chunk_backtracking(viterbi_chunk_borders, local_gamma, transiti
         State sequences. Shape (num_model, b, num_chunks * chunk_length).
     """
     num_model, b, num_chunks, q, chunk_length, _ = local_gamma.shape
-    local_gamma = local_gamma.view(num_model, b * num_chunks, q, chunk_length, q)
-    start_states = viterbi_chunk_borders[:, :, :, 0].view(num_model, b * num_chunks, 1)
-    end_states = viterbi_chunk_borders[:, :, :, 1].view(num_model, b * num_chunks, 1)
+    local_gamma = local_gamma.reshape(num_model, b * num_chunks, q, chunk_length, q)
+    start_states = viterbi_chunk_borders[:, :, :, 0].reshape(num_model, b * num_chunks, 1)
+    end_states = viterbi_chunk_borders[:, :, :, 1].reshape(num_model, b * num_chunks, 1)
 
     local_gamma = torch.take_along_dim(local_gamma, start_states.unsqueeze(-1).unsqueeze(-1), dim=2)[:, :, 0]
 
@@ -352,7 +352,7 @@ def viterbi_full_chunk_backtracking(viterbi_chunk_borders, local_gamma, transiti
         state_seqs_max_lik.append(cur_states)
 
     state_seqs_max_lik = torch.cat(state_seqs_max_lik[::-1], dim=-1)  # Shape: (num_model, b * num_chunks, chunk_length)
-    state_seqs_max_lik = state_seqs_max_lik.view(num_model, b, num_chunks * chunk_length)
+    state_seqs_max_lik = state_seqs_max_lik.reshape(num_model, b, num_chunks * chunk_length)
     return state_seqs_max_lik
 
 
@@ -369,13 +369,13 @@ def viterbi_parallel(emission_probs, parallel_factor, A, At, init_dist):
                              use_first_position_emission=parallel_factor == 1,
                              non_homogeneous_mask_func=None)
 
-    gamma = gamma.view(num_model, b * parallel_factor * z, chunk_size, q)
+    gamma = gamma.reshape(num_model, b * parallel_factor * z, chunk_size, q)
     if parallel_factor == 1:
         viterbi_paths = viterbi_backtracking(gamma, At, non_homogeneous_mask_func=None)
         variables_out = gamma
     else:
-        emission_probs_at_chunk_start = emission_probs[:, :, 0].view(num_model, b, parallel_factor, q)
-        gamma_local_at_chunk_end = gamma[:, :, -1].view(num_model, b, parallel_factor, q, q)
+        emission_probs_at_chunk_start = emission_probs[:, :, 0].reshape(num_model, b, parallel_factor, q)
+        gamma_local_at_chunk_end = gamma[:, :, -1].reshape(num_model, b, parallel_factor, q, q)
 
         gamma_at_chunk_borders = viterbi_chunk_dyn_prog(emission_probs_at_chunk_start, init_dist[:, 0], A,
                                                         gamma_local_at_chunk_end)
@@ -385,7 +385,7 @@ def viterbi_parallel(emission_probs, parallel_factor, A, At, init_dist):
         viterbi_chunk_borders = viterbi_chunk_backtracking(gamma_at_chunk_borders, gamma_local_at_chunk_end,
                                                            At_parallel)
 
-        gamma = gamma.view(num_model, b, parallel_factor, z, chunk_size, q)
+        gamma = gamma.reshape(num_model, b, parallel_factor, z, chunk_size, q)
         viterbi_paths = viterbi_full_chunk_backtracking(viterbi_chunk_borders, gamma, At)
         num_model, b, num_chunks, q, chunk_length, _ = gamma.shape
         variables_out = gamma.transpose(-2, -3)
