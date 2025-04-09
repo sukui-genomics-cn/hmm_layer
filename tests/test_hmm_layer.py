@@ -73,6 +73,7 @@ def test_gene_hmm_layer():
     from hmm_layer import GenePredHMMLayer
 
     hmm_inputs = np.load("hmm_inputs.npy")
+    log_post = np.load("log_post_arr.npy")
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # Define the forward layer

@@ -133,6 +133,27 @@ class GenePredHMMLayer(MsaHmmLayer):
             device=self.device
         )
 
+        reverse_emitter = GenePredHMMEmitter(
+            start_codons=self.start_codons,
+            stop_codons=self.stop_codons,
+            intron_begin_pattern=self.intron_begin_pattern,
+            intron_end_pattern=self.intron_end_pattern,
+            l2_lambda=self.variance_l2_lambda,
+            num_models=self.num_models,
+            num_copies=self.num_copies,
+            init=self.emitter_init,
+            trainable_emissions=self.trainable_emissions,
+            emit_embeddings=self.emit_embeddings,
+            embedding_dim=self.embedding_dim,
+            full_covariance=self.full_covariance,
+            embedding_kernel_init=self.embedding_kernel_init,
+            initial_variance=self.initial_variance,
+            temperature=self.temperature,
+            share_intron_parameters=self.share_intron_parameters,
+            trainable_nucleotides_at_exons=self.trainable_nucleotides_at_exons,
+            device=self.device
+        )
+
         transitioner = GenePredMultiHMMTransitioner(
             k=self.num_copies,
             num_models=self.num_models,
@@ -145,6 +166,19 @@ class GenePredHMMLayer(MsaHmmLayer):
             device=self.device,
         )
 
+        reverse_transitioner = GenePredMultiHMMTransitioner(
+            k=self.num_copies,
+            num_models=self.num_models,
+            initial_exon_len=self.initial_exon_len,
+            initial_intron_len=self.initial_intron_len,
+            initial_ir_len=self.initial_ir_len,
+            starting_distribution_init=self.starting_distribution_init,
+            starting_distribution_trainable=self.trainable_starting_distribution,
+            transitions_trainable=self.trainable_transitions,
+            device=self.device,
+        )
+        reverse_transitioner.reverse = True
+
         # Initialize the cell
         cell = HmmCell(
             num_states=[emitter.num_states] * self.num_models,
@@ -156,15 +190,14 @@ class GenePredHMMLayer(MsaHmmLayer):
         )
 
         reverse_cell = HmmCell(
-            num_states=[emitter.num_states] * self.num_models,
+            num_states=[reverse_emitter.num_states] * self.num_models,
             dim=self.dim,
-            emitter=emitter,
-            transitioner=transitioner,
+            emitter=reverse_emitter,
+            transitioner=reverse_transitioner,
             use_fake_step_counter=True,
             device=self.device
         )
         reverse_cell.reverse = True
-        reverse_cell.transitioner.reverse = True
         return cell, reverse_cell
 
     def forward(self, inputs, nucleotides=None, embeddings=None, end_hints=None, training=False, use_loglik=True):
