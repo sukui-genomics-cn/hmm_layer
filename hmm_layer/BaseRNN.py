@@ -193,9 +193,9 @@ class BaseRNN(nn.Module):
             # Convert to (seq_len, batch_size, input_size) if batch_first
             inputs = inputs.transpose(0, 1)
 
-        # if self.reverse:
-        #     # Reverse the sequence dimension
-        #     inputs = torch.flip(inputs, [0])
+        if self.reverse:
+            # Reverse the sequence dimension
+            inputs = torch.flip(inputs, [0])
 
         seq_len, batch_size, _ = inputs.size()
 
