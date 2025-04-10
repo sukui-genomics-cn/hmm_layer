@@ -6,6 +6,11 @@ from .Bidirectional import Bidirectional
 from .TotalProbabilityCell import TotalProbabilityCell
 
 
+
+def show_value(value, name="value"):
+    print(f"{name}: {value.mean():.4f}, {value.std():.4f}, {value.min():.4f}, {value.max():.4f}")
+
+
 class MsaHmmLayer(nn.Module):
     """A layer that computes the log-likelihood and posterior state probabilities for batches of observations
     under a number of HMMs.
@@ -437,9 +442,10 @@ def _state_posterior_log_probs_impl(inputs, cell, reverse_cell,
 
     num_model, b, seq_len, s = inputs.shape
     q = cell.max_num_states
+    show_value(inputs, "inputs")
 
     emission_probs = cell.emission_probs(inputs, end_hints=end_hints, training=training)
-
+    show_value(emission_probs, "emission_probs")
     # Reshape to equally sized chunks according to parallel factor
     chunk_size = seq_len // parallel_factor
     emission_probs = emission_probs.reshape(num_model * b * parallel_factor, chunk_size, q)
@@ -472,11 +478,12 @@ def _state_posterior_log_probs_impl(inputs, cell, reverse_cell,
         posterior, states = torch.zeros(()), forward_step_1_state + backward_step_1_state
         if cell.use_step_counter:
             cell.step_counter += 1
-
+    show_value(posterior, "posterior")
     # Manually do the last forward and backward step
     forward_last, final_state = cell(emission_probs[:, -1], states[:2], training=training)
     backward_last, _ = reverse_cell(emission_probs[:, 0], states[2:], training=training)
-
+    show_value(forward_last, "forward_last")
+    show_value(backward_last, "backward_last")
     # forward_last, final_state = cell(emission_probs[:, -1], states, training=training)
     # backward_last, _ = reverse_cell(emission_probs[:, 0], states, training=training)
 
@@ -495,6 +502,7 @@ def _state_posterior_log_probs_impl(inputs, cell, reverse_cell,
     else:
         posterior = torch.cat([posterior_1.unsqueeze(1), posterior_last.unsqueeze(1)], dim=1)
 
+    show_value(posterior, "posterior")
     if parallel_factor == 1:
         posterior = posterior.reshape(num_model, b, seq_len, -1)
         loglik = final_state[1].reshape(num_model, b)
@@ -506,10 +514,12 @@ def _state_posterior_log_probs_impl(inputs, cell, reverse_cell,
                                                           total_prob_rnn_rev, b, seq_len,
                                                           revert_chunks=False, parallel_factor=parallel_factor)
         posterior = forward_result + backward_result
+        show_value(forward_result, "forward_result")
+        show_value(backward_result, "backward_result")
 
     if not no_loglik:
         posterior = posterior - loglik.unsqueeze(-1).unsqueeze(-1)
-
+    show_value(posterior, "posterior")
     if return_prior:
         prior = cell.get_prior_log_density()
         aux_loss = cell.get_aux_loss()

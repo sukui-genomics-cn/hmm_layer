@@ -87,6 +87,11 @@ def test_gene_hmm_layer():
         training=True,
     )
     logger.info(f"outputs shape {outputs.shape}")
+
+    compare_out = log_post - outputs.cpu().numpy()
+    logger.info(f"compare mean: {compare_out.mean()}, std:{compare_out.std()}")
+
+
     logger.info("end run hmm_layer")
 
 

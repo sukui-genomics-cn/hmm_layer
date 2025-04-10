@@ -3,6 +3,11 @@ import torch.nn as nn
 from typing import Optional, Tuple, Union
 
 
+
+def show_value(value, name="value"):
+    print(f"{name}: {value.mean():.4f}, {value.std():.4f}, {value.min():.4f}, {value.max():.4f}")
+
+
 class Bidirectional(nn.Module):
     """Simple bidirectional wrapper for forward and backward RNNs with shared state.
 
@@ -142,7 +147,8 @@ class Bidirectional(nn.Module):
         else:
             reversed_sequences = torch.flip(sequences, [0])
         backward_output, backward_states = self.backward_layer(reversed_sequences, backward_state)
-
+        show_value(forward_output, "forward_layer_output")
+        show_value(backward_output, "backward_layer_output")
         # # Reverse the backward output to align with the forward output
         # if self.backward_layer.batch_first:
         #     backward_output = torch.flip(backward_output, [1])
