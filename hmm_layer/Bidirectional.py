@@ -2,10 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Optional, Tuple, Union
 
-
-
-def show_value(value, name="value"):
-    print(f"{name}: {value.mean():.4f}, {value.std():.4f}, {value.min():.4f}, {value.max():.4f}")
+from .utils import show_value
 
 
 class Bidirectional(nn.Module):
@@ -140,15 +137,25 @@ class Bidirectional(nn.Module):
             forward_state, backward_state = None, None
 
         # Forward pass
+        show_value(forward_state[0], "03.forward_layer_state_old_scaled_forward")
+        show_value(forward_state[1], "03.forward_layer_state_old_loglike")
+        show_value(backward_state[0], "03.backward_layer_old_state_scaled_forward")
+        show_value(backward_state[1], "03.backward_layer_old_state_loglike")
         forward_output, forward_states = self.forward_layer(sequences, forward_state)
         # Backward pass (reverse the sequence for the backward layer)
-        if self.backward_layer.batch_first:
-            reversed_sequences = torch.flip(sequences, [1])
-        else:
-            reversed_sequences = torch.flip(sequences, [0])
-        backward_output, backward_states = self.backward_layer(reversed_sequences, backward_state)
-        show_value(forward_output, "forward_layer_output")
-        show_value(backward_output, "backward_layer_output")
+        # if self.backward_layer.batch_first:
+        #     reversed_sequences = torch.flip(sequences, [1])
+        # else:
+        #     reversed_sequences = torch.flip(sequences, [0])
+        backward_output, backward_states = self.backward_layer(sequences, backward_state)
+
+        show_value(forward_states[0], "03.forward_layer_state_new_scaled_forward")
+        show_value(forward_states[1], "03.forward_layer_state_new_loglike")
+        show_value(backward_states[0], "03.backward_layer_new_state_scaled_forward")
+        show_value(backward_states[1], "03.backward_layer_new_state_loglike")
+
+        show_value(forward_output, "03.forward_layer_output")
+        show_value(backward_output, "04.backward_layer_output")
         # # Reverse the backward output to align with the forward output
         # if self.backward_layer.batch_first:
         #     backward_output = torch.flip(backward_output, [1])
