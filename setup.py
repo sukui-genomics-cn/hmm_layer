@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="hmm-layer",
-    version="0.2.0",
+    version="0.3.0",
     description="A PyTorch-based Hidden Markov Model (HMM) Layer for Genomic Structure Prediction",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",

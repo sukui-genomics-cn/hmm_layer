@@ -40,7 +40,7 @@ class GenePredHMMLayer(MsaHmmLayer):
                  variance_l2_lambda=0.01,
                  disable_metrics=True,
                  parallel_factor=1,
-                 use_border_hints=True,
+                 use_border_hints=False,
                  device=None,
                  **kwargs):
 
