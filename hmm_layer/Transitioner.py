@@ -336,50 +336,97 @@ class ProfileHMMTransitioner(nn.Module):
 
 
 def make_transition_matrix_from_indices(indices, kernel, num_states, approx_log_zero=-1000.):
+    """Constructs a dense probabilistic transition matrix from a sparse index list and a kernel.
+    Args:
+        indices: A 2D tensor of shape (num_transitions, 2) that specifies the indices of the kernel.
+        kernel: A 1D tensor of shape (num_transitions) that contains the kernel values.
+        num_states: The number of states in the model.
+    Returns:
+        A dense probabilistic transition matrix of shape (num_states, num_states).
     """
-    从稀疏索引列表和内核构建稠密概率转移矩阵。
+    # Convert indices to torch tensor if it's not already
+    if not torch.is_tensor(indices):
+        indices = torch.from_numpy(np.array(indices))
 
-    参数 : 
-        indices: 形状为 (num_transitions, 2) 的 2D 张量, 指定内核的索引。
-        kernel: 形状为 (num_transitions) 的 1D 张量, 包含内核值。
-        num_states: 模型中的状态数。
-        approx_log_zero: 用于近似日志零的值, 用于处理不存在的转换。
-
-    返回 : 
-        形状为 (num_states, num_states) 的稠密概率转移矩阵。
-    """
-    # 确保索引按行主序排列
-    row_major_order = np.argsort([i * num_states + j for i, j in indices])
+    # torch.sparse requires a strict row-major ordering of the indices
+    row_major_order = torch.argsort(torch.tensor([i * num_states + j for i, j in indices]))
+    # reorder row-major
     indices_row_major = indices[row_major_order]
     kernel_row_major = kernel[row_major_order]
 
-    # 将内核值限制在 approx_log_zero + 1 以上, 以避免过小的数值
-    kernel_row_major = torch.maximum(kernel_row_major, torch.tensor(approx_log_zero + 1.0))
-    kernel_row_major[kernel_row_major == 0] = 1e-6
+    # don't allow too small values in the kernel
+    kernel_row_major = torch.maximum(kernel_row_major, torch.tensor(approx_log_zero + 1, device=kernel.device))
+    kernel_row_major[kernel_row_major == 0] = 1e-12
 
-    # 创建稀疏张量
+    # create sparse tensor - need to transpose indices for COO format
     sparse_kernel = torch.sparse_coo_tensor(
-        torch.tensor(indices_row_major).t().to(kernel_row_major.device),
-        kernel_row_major,
-        (num_states, num_states)
+        indices=indices_row_major.t().to(kernel.device),
+        values=kernel_row_major,
+        size=[num_states, num_states],
+        device=kernel.device
     )
 
-    # 将稀疏张量转换为稠密张量, 默认值为 approx_log_zero
-    dense_kernel = torch.where(sparse_kernel.to_dense() == 0, torch.full_like(sparse_kernel.to_dense(), approx_log_zero), sparse_kernel.to_dense())
+    # convert to dense
+    dense_kernel = sparse_kernel.to_dense()
+    # fill default value for non-specified indices
+    dense_kernel[dense_kernel == 0] = approx_log_zero
 
-    # 对稠密内核应用 softmax, 忽略不存在的转换
+    # softmax that ignores non-existing transitions
     dense_probs = torch.nn.functional.softmax(dense_kernel, dim=-1)
 
-    # 创建掩码, 用于掩盖不存在的转换
-    mask = (dense_kernel > approx_log_zero).float()
-
-    # 添加一个很小的数值以增加数值稳定性, 并将不存在的转换置零, 然后进行归一化
+    # mask out non-existing transitions and rescale for numerical stability
+    mask = (dense_kernel > approx_log_zero).to(dense_probs.dtype)
     dense_probs += 1e-16
     dense_probs = dense_probs * mask
-    dense_probs /= (torch.sum(dense_probs, dim=-1, keepdim=True)+1e-16)
+    dense_probs /= torch.sum(dense_probs, dim=-1, keepdim=True)
 
     return dense_probs
 
+# def make_transition_matrix_from_indices(indices, kernel, num_states, approx_log_zero=-1000.):
+#     """
+#     从稀疏索引列表和内核构建稠密概率转移矩阵。
+#
+#     参数 :
+#         indices: 形状为 (num_transitions, 2) 的 2D 张量, 指定内核的索引。
+#         kernel: 形状为 (num_transitions) 的 1D 张量, 包含内核值。
+#         num_states: 模型中的状态数。
+#         approx_log_zero: 用于近似日志零的值, 用于处理不存在的转换。
+#
+#     返回 :
+#         形状为 (num_states, num_states) 的稠密概率转移矩阵。
+#     """
+#     # 确保索引按行主序排列
+#     row_major_order = np.argsort([i * num_states + j for i, j in indices])
+#     indices_row_major = indices[row_major_order]
+#     kernel_row_major = kernel[row_major_order]
+#
+#     # 将内核值限制在 approx_log_zero + 1 以上, 以避免过小的数值
+#     kernel_row_major = torch.maximum(kernel_row_major, torch.tensor(approx_log_zero + 1.0))
+#     kernel_row_major[kernel_row_major == 0] = 1e-10
+#
+#     # 创建稀疏张量
+#     sparse_kernel = torch.sparse_coo_tensor(
+#         torch.tensor(indices_row_major).t().to(kernel_row_major.device),
+#         kernel_row_major,
+#         (num_states, num_states)
+#     )
+#
+#     # 将稀疏张量转换为稠密张量, 默认值为 approx_log_zero
+#     dense_kernel = torch.where(sparse_kernel.to_dense() == 0, torch.full_like(sparse_kernel.to_dense(), approx_log_zero), sparse_kernel.to_dense())
+#
+#     # 对稠密内核应用 softmax, 忽略不存在的转换
+#     dense_probs = torch.nn.functional.softmax(dense_kernel, dim=-1)
+#
+#     # 创建掩码, 用于掩盖不存在的转换
+#     mask = (dense_kernel > approx_log_zero).float()
+#
+#     # 添加一个很小的数值以增加数值稳定性, 并将不存在的转换置零, 然后进行归一化
+#     dense_probs += 1e-16
+#     dense_probs = dense_probs * mask
+#     dense_probs /= (torch.sum(dense_probs, dim=-1, keepdim=True)+1e-16)
+#
+#     return dense_probs
+#
 
 def _make_explicit_transition_kernel_parts(length): 
     return [("begin_to_match", length), 

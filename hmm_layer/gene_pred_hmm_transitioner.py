@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+from .utils import show_value
 from .Transitioner import make_transition_matrix_from_indices
 
 
@@ -82,6 +83,8 @@ class SimpleGenePredHMMTransitioner(nn.Module):
         self.A = nn.Parameter(A, requires_grad=self.transitions_trainable)
         A_transposed = torch.transpose(self.A, 1, 2)
         self.A_transposed = nn.Parameter(A_transposed, requires_grad=self.transitions_trainable)
+        show_value(A, "02.transitioner.A")
+        show_value(A_transposed, "02.transitioner.A_transposed")
 
     def make_A_sparse(self, values=None):
         """
@@ -162,6 +165,7 @@ class SimpleGenePredHMMTransitioner(nn.Module):
 
     def make_transition_init(self, k=1, sd=0.05):
         # 使用大致真实的初始长度分布
+        sd = 0  # TODO: for testing, keeping small change.
         init = []
         for edge in self.indices:
             # edge = (model, from, to), ingore model for now
