@@ -38,7 +38,7 @@ class TestRNN(unittest.TestCase):
         # device = torch.device("cpu")
         stacked_inputs = torch.randn(size=(2, 9999, 20)).to(device)
         layer = GenePredHMMLayer(
-            parallel_factor=99
+            parallel_factor=1
         ).to(device)
 
         for key, value in layer.named_parameters():

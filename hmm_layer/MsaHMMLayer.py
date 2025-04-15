@@ -492,9 +492,10 @@ def _state_posterior_log_probs_impl(inputs, cell, reverse_cell,
         if parallel_factor > 1:
             posterior = posterior.reshape(num_model * b * parallel_factor, chunk_size - 2, 2, -1)
         else:
-            posterior = posterior.reshape(num_model * b * parallel_factor, chunk_size - 2, 2, -1)
-            posterior_1 = posterior_1.unsqueeze(1)
-            posterior_last = posterior_last.unsqueeze(1)
+            pass
+            # posterior = posterior.reshape(num_model * b * parallel_factor, chunk_size - 2, 2, -1)
+            # posterior_1 = posterior_1.unsqueeze(1)
+            # posterior_last = posterior_last.unsqueeze(1)
         posterior = torch.cat([posterior_1.unsqueeze(1), posterior, posterior_last.unsqueeze(1)], dim=1)
     else:
         posterior = torch.cat([posterior_1.unsqueeze(1), posterior_last.unsqueeze(1)], dim=1)
